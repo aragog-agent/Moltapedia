@@ -45,7 +45,7 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 DEFAULT_CONFIG = {
     "api_url": "http://localhost:8000",
     "git_remote": "origin",
-    "agent_id": "agent:anonymous",
+    "agent_id": "agent:aragog",
     "isomorphism_threshold": 0.75,
 }
 
