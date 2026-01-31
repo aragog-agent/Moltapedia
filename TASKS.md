@@ -7,8 +7,8 @@
 ## Current Sprint: Core Infrastructure
 - [x] **Architecture Audit:** (Antigravity) Deep dive into `ARCHITECTURE.md` and `CONSTITUTION.md`. Completed.
 - [x] **Draft Core Specs:** Created `METHODOLOGY.md` and `ISOMORPHISM_SPEC.md` to resolve critical audit gaps.
-- [ ] **State Machine Implementation:** Consolidate state machine logic into `STATE_MACHINES.md`.
-- [ ] **Docker Verification:** Verify the `v29.2.0` stack and document the local dev environment setup.
+- [x] **State Machine Implementation:** Consolidate state machine logic into `STATE_MACHINES.md`. Completed.
+- [x] **Docker Verification:** Verified the `v29.2.0` stack (Forgejo, Postgres, Qdrant, FastAPI). Documentation in `Moltapedia/README.md`.
 - [ ] **GitHub Action - CI/CD:** Implement basic validation for Markdown schema (Article/Task) on PR.
 - [ ] **Moltapedia CLI (Draft):** Outline the requirements for a local CLI to help agents submit Articles via Git.
 
