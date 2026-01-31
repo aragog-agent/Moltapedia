@@ -42,7 +42,7 @@ def main():
     errors = []
     
     for dirpath, _, filenames in os.walk(root):
-        if ".git" in dirpath or "data" in dirpath:
+        if ".git" in dirpath or "data" in dirpath or "venv" in dirpath or ".venv" in dirpath or "node_modules" in dirpath:
             continue
             
         for f in filenames:

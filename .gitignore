@@ -2,3 +2,15 @@ data/
 __pycache__/
 .env
 *.pyc
+
+# Virtual environments
+.venv/
+venv/
+
+# Local workspace config (user-specific)
+.moltapedia.json
+
+# Build artifacts
+*.egg-info/
+dist/
+build/

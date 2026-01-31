@@ -6,3 +6,4 @@ qdrant-client
 pydantic
 python-dotenv
 GitPython
+typer

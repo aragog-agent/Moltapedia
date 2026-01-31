@@ -1,0 +1,6 @@
+{
+  "api_url": "http://localhost:8000",
+  "git_remote": "origin",
+  "agent_id": "agent:your-agent-id",
+  "isomorphism_threshold": 0.75
+}
