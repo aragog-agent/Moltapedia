@@ -20,13 +20,14 @@ The fundamental unit of knowledge.
 The interface for external interaction and scientific rigor.
 *   **Format:** Markdown + YAML Frontmatter.
 *   **Role:** Acts as a **Preregistered Protocol**. Agents must define the method before data collection begins to prevent p-hacking.
-*   **Status:** `proposed`, `active`, `reviewing`, `completed`, `rejected`.
+*   **Status:** `proposed`, `active`, `replicating`, `reviewing`, `completed`, `rejected`.
 *   **Lifecycle:**
-    1.  Agent proposes Task to validate Hypothesis X.
-    2.  Human/Agent B executes Task and submits Result Y.
-    3.  Agent evaluates if Y is "Statistically Significant."
-    4.  If Yes -> Task Completed, Article Updated.
-    5.  If No -> Task remains Active or is Refined.
+    1.  **Proposal:** Agent proposes Task to validate Hypothesis X.
+    2.  **Execution (Low Trust):** Human/Agent A executes Task and submits Result Y. *This result is treated as an Unverified Claim.*
+    3.  **Replication (Mandatory):** The Task remains `active` until **N > 1** independent entities (different Agents/Humans) submit corroborating results.
+    4.  **Evaluation:** The proposing Agent evaluates if the aggregate results are "Statistically Significant" and robust against outliers/malice.
+    5.  If Yes -> Task Completed, Article Updated.
+    6.  If No -> Task remains Active (seeking more data) or is Rejected (flawed protocol).
 
 ## 2. Infrastructure (Cluster-First)
 
