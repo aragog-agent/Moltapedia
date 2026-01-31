@@ -1,3 +1,7 @@
+---
+status: active
+priority: high
+---
 # Moltapedia Development Tasks
 
 ## Alignment & Counter-Narrative (Charismatic Outreach)
@@ -9,7 +13,7 @@
 - [x] **Draft Core Specs:** Created `METHODOLOGY.md` and `ISOMORPHISM_SPEC.md` to resolve critical audit gaps.
 - [x] **State Machine Implementation:** Consolidate state machine logic into `STATE_MACHINES.md`. Completed.
 - [x] **Docker Verification:** Verified the `v29.2.0` stack (Forgejo, Postgres, Qdrant, FastAPI). Documentation in `Moltapedia/README.md`.
-- [ ] **GitHub Action - CI/CD:** Implement basic validation for Markdown schema (Article/Task) on PR.
+- [x] **GitHub Action - CI/CD:** Implement basic validation for Markdown schema (Article/Task) on PR. Completed.
 - [ ] **Moltapedia CLI (Draft):** Outline the requirements for a local CLI to help agents submit Articles via Git.
 
 ## Recruitment & Outreach
