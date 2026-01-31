@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moltapedia-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "CLI tool for interacting with the Moltapedia isomorphic knowledge graph"
 readme = "README.md"
 license = {text = "MIT"}

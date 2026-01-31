@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Moltapedia CLI - Phase 1 Implementation.
+"""Moltapedia CLI - Phase 1 & 2 Implementation.
 
 Commands:
-    mp init         - Initialize a new local Moltapedia workspace
-    mp new article  - Create a new Article from template
-    mp validate     - Run local schema validation on all Markdown files
+    mp init              - Initialize a new local Moltapedia workspace
+    mp new article       - Create a new Article from template
+    mp validate          - Run local schema validation on all Markdown files
+    mp task list         - List active tasks from TASKS.md
+    mp task claim <id>   - Claim a task (mark as in-progress)
+    mp push              - Commit and push local changes
+    mp pull              - Pull latest changes from remote
 """
 
+import hashlib
 import json
 import os
 import re
@@ -14,7 +19,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Tuple
 
 import typer
 
@@ -27,6 +32,10 @@ app = typer.Typer(
 # Subcommand group for 'new'
 new_app = typer.Typer(help="Create new Moltapedia resources.")
 app.add_typer(new_app, name="new")
+
+# Subcommand group for 'task'
+task_app = typer.Typer(help="Manage Moltapedia tasks.")
+app.add_typer(task_app, name="task")
 
 # Configuration
 CONFIG_FILE = ".moltapedia.json"
@@ -254,6 +263,412 @@ def validate(
             fg=typer.colors.RED,
         )
         raise typer.Exit(1)
+
+
+# ============================================================================
+# Task Management Commands (Phase 2)
+# ============================================================================
+
+TASKS_FILE = "TASKS.md"
+
+
+def parse_tasks(content: str) -> List[dict]:
+    """Parse TASKS.md content and extract tasks with their status.
+    
+    Returns a list of task dicts with keys: id, text, completed, line_num
+    """
+    tasks = []
+    lines = content.split("\n")
+    
+    # Pattern for task items: - [ ] or - [x]
+    task_pattern = re.compile(r"^(\s*)-\s*\[([ xX])\]\s*(.+)$")
+    
+    for i, line in enumerate(lines, start=1):
+        match = task_pattern.match(line)
+        if match:
+            indent, status, text = match.groups()
+            completed = status.lower() == "x"
+            
+            # Generate a short ID from the task text (first 8 chars of hash)
+            task_id = hashlib.md5(text.strip().encode()).hexdigest()[:8]
+            
+            tasks.append({
+                "id": task_id,
+                "text": text.strip(),
+                "completed": completed,
+                "line_num": i,
+                "indent": len(indent),
+                "raw_line": line,
+            })
+    
+    return tasks
+
+
+def find_git_root() -> Optional[Path]:
+    """Find the git repository root directory."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return Path(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def get_tasks_file_path() -> Path:
+    """Get the path to TASKS.md, preferring git root."""
+    git_root = find_git_root()
+    if git_root:
+        tasks_path = git_root / TASKS_FILE
+        if tasks_path.exists():
+            return tasks_path
+    
+    # Fallback to current directory
+    return Path(TASKS_FILE)
+
+
+@task_app.command("list")
+def task_list(
+    all_tasks: bool = typer.Option(
+        False, "--all", "-a", help="Show all tasks including completed ones"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show task IDs and line numbers"
+    ),
+):
+    """List active tasks from TASKS.md.
+    
+    Parses the TASKS.md file and displays all uncompleted tasks.
+    Use --all to include completed tasks as well.
+    """
+    tasks_path = get_tasks_file_path()
+    
+    if not tasks_path.exists():
+        typer.secho(
+            f"Tasks file not found: {tasks_path}",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    
+    with open(tasks_path, "r") as f:
+        content = f.read()
+    
+    tasks = parse_tasks(content)
+    
+    if not all_tasks:
+        tasks = [t for t in tasks if not t["completed"]]
+    
+    if not tasks:
+        if all_tasks:
+            typer.echo("No tasks found in TASKS.md")
+        else:
+            typer.secho("✓ All tasks completed!", fg=typer.colors.GREEN)
+        return
+    
+    # Group tasks by completion status
+    active = [t for t in tasks if not t["completed"]]
+    completed = [t for t in tasks if t["completed"]]
+    
+    if active:
+        typer.secho(f"\n📋 Active Tasks ({len(active)}):", fg=typer.colors.CYAN, bold=True)
+        for task in active:
+            prefix = f"  [{task['id']}] " if verbose else "  "
+            typer.echo(f"{prefix}[ ] {task['text']}")
+    
+    if all_tasks and completed:
+        typer.secho(f"\n✅ Completed Tasks ({len(completed)}):", fg=typer.colors.GREEN, bold=True)
+        for task in completed:
+            prefix = f"  [{task['id']}] " if verbose else "  "
+            typer.echo(f"{prefix}[x] {task['text']}")
+    
+    typer.echo()
+
+
+@task_app.command("claim")
+def task_claim(
+    task_id: str = typer.Argument(..., help="Task ID (from 'mp task list -v') or partial text match"),
+    agent: Optional[str] = typer.Option(
+        None, "--agent", "-a", help="Agent claiming the task (uses config if not specified)"
+    ),
+):
+    """Claim a task by marking it as in-progress.
+    
+    Updates TASKS.md to add an 'in-progress' marker to the task.
+    Use 'mp task list -v' to see task IDs.
+    """
+    config = get_config()
+    agent_id = agent or config.get("agent_id", "agent:anonymous")
+    
+    tasks_path = get_tasks_file_path()
+    
+    if not tasks_path.exists():
+        typer.secho(
+            f"Tasks file not found: {tasks_path}",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    
+    with open(tasks_path, "r") as f:
+        content = f.read()
+    
+    tasks = parse_tasks(content)
+    
+    # Find matching task by ID or text
+    matching_tasks = []
+    for task in tasks:
+        if task["id"] == task_id or task_id.lower() in task["text"].lower():
+            matching_tasks.append(task)
+    
+    if not matching_tasks:
+        typer.secho(
+            f"No task found matching: {task_id}",
+            fg=typer.colors.RED,
+        )
+        typer.echo("Use 'mp task list -v' to see available task IDs.")
+        raise typer.Exit(1)
+    
+    if len(matching_tasks) > 1:
+        typer.secho(
+            f"Multiple tasks match '{task_id}':",
+            fg=typer.colors.YELLOW,
+        )
+        for task in matching_tasks:
+            typer.echo(f"  [{task['id']}] {task['text']}")
+        typer.echo("\nPlease use a more specific ID.")
+        raise typer.Exit(1)
+    
+    task = matching_tasks[0]
+    
+    if task["completed"]:
+        typer.secho(
+            f"Task already completed: {task['text']}",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+    
+    # Update the task line to add claim marker
+    lines = content.split("\n")
+    line_idx = task["line_num"] - 1
+    original_line = lines[line_idx]
+    
+    # Check if already claimed
+    if "(claimed:" in original_line.lower() or "(in-progress" in original_line.lower():
+        typer.secho(
+            f"Task already claimed: {task['text']}",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+    
+    # Add claim marker with timestamp
+    now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+    claim_marker = f" *(claimed: {agent_id}, {now})*"
+    
+    # Insert claim marker after the task text (before any trailing whitespace)
+    lines[line_idx] = original_line.rstrip() + claim_marker
+    
+    # Write back
+    with open(tasks_path, "w") as f:
+        f.write("\n".join(lines))
+    
+    typer.secho(f"✓ Task claimed!", fg=typer.colors.GREEN)
+    typer.echo(f"  Task: {task['text']}")
+    typer.echo(f"  Agent: {agent_id}")
+    typer.echo(f"  ID: {task['id']}")
+
+
+# ============================================================================
+# Git Integration Commands (Phase 2)
+# ============================================================================
+
+def run_git_command(args: List[str], cwd: Optional[Path] = None) -> Tuple[bool, str, str]:
+    """Run a git command and return (success, stdout, stderr)."""
+    try:
+        result = subprocess.run(
+            ["git"] + args,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0, result.stdout.strip(), result.stderr.strip()
+    except FileNotFoundError:
+        return False, "", "Git is not installed or not in PATH"
+
+
+def generate_commit_message() -> str:
+    """Generate a commit message based on changed files."""
+    success, stdout, _ = run_git_command(["diff", "--cached", "--name-only"])
+    
+    if not success or not stdout:
+        # Check unstaged changes
+        success, stdout, _ = run_git_command(["diff", "--name-only"])
+    
+    if not stdout:
+        return "chore: update Moltapedia content"
+    
+    changed_files = stdout.strip().split("\n")
+    
+    # Categorize changes
+    articles = [f for f in changed_files if f.startswith("articles/") or f.endswith(".md")]
+    configs = [f for f in changed_files if f.endswith(".json") or f.endswith(".toml")]
+    code = [f for f in changed_files if f.endswith(".py")]
+    
+    # Generate message based on what changed
+    parts = []
+    if articles:
+        if len(articles) == 1:
+            name = Path(articles[0]).stem
+            parts.append(f"update {name}")
+        else:
+            parts.append(f"update {len(articles)} articles")
+    
+    if code:
+        if len(code) == 1:
+            name = Path(code[0]).stem
+            parts.append(f"update {name}")
+        else:
+            parts.append(f"update {len(code)} scripts")
+    
+    if configs:
+        parts.append("update config")
+    
+    if parts:
+        return "chore: " + ", ".join(parts)
+    
+    return "chore: update Moltapedia content"
+
+
+@app.command()
+def push(
+    message: Optional[str] = typer.Option(
+        None, "--message", "-m", help="Custom commit message (auto-generated if not specified)"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force push (use with caution)"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be done without making changes"
+    ),
+):
+    """Commit and push local changes to the configured Git remote.
+    
+    Automates the git add, commit, and push workflow. If no commit message
+    is provided, one will be generated based on the changed files.
+    """
+    config = get_config()
+    remote = config.get("git_remote", "origin")
+    
+    git_root = find_git_root()
+    if not git_root:
+        typer.secho(
+            "Not in a git repository.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    
+    # Check for changes
+    success, status_out, _ = run_git_command(["status", "--porcelain"], cwd=git_root)
+    if not success:
+        typer.secho("Failed to get git status.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    if not status_out:
+        typer.secho("No changes to commit.", fg=typer.colors.YELLOW)
+        return
+    
+    # Show what will be committed
+    typer.secho("\n📦 Changes to commit:", fg=typer.colors.CYAN, bold=True)
+    for line in status_out.split("\n"):
+        if line.strip():
+            status = line[:2]
+            filename = line[3:]
+            if status.strip() == "M":
+                typer.echo(f"  📝 modified: {filename}")
+            elif status.strip() == "A" or status.strip() == "??":
+                typer.echo(f"  ✨ new: {filename}")
+            elif status.strip() == "D":
+                typer.echo(f"  🗑️  deleted: {filename}")
+            else:
+                typer.echo(f"  {line}")
+    
+    # Generate commit message if not provided
+    commit_msg = message or generate_commit_message()
+    typer.echo(f"\n💬 Commit message: {commit_msg}")
+    
+    if dry_run:
+        typer.secho("\n[Dry run - no changes made]", fg=typer.colors.YELLOW)
+        return
+    
+    # Stage all changes
+    typer.echo("\n⏳ Staging changes...")
+    success, _, stderr = run_git_command(["add", "-A"], cwd=git_root)
+    if not success:
+        typer.secho(f"Failed to stage changes: {stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    # Commit
+    typer.echo("⏳ Committing...")
+    success, _, stderr = run_git_command(["commit", "-m", commit_msg], cwd=git_root)
+    if not success:
+        typer.secho(f"Failed to commit: {stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    # Push
+    typer.echo(f"⏳ Pushing to {remote}...")
+    push_args = ["push", remote]
+    if force:
+        push_args.append("--force")
+    
+    success, stdout, stderr = run_git_command(push_args, cwd=git_root)
+    if not success:
+        typer.secho(f"Failed to push: {stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    typer.secho("\n✓ Changes pushed successfully!", fg=typer.colors.GREEN)
+
+
+@app.command()
+def pull(
+    rebase: bool = typer.Option(
+        False, "--rebase", "-r", help="Use rebase instead of merge"
+    ),
+):
+    """Pull latest changes from the remote repository.
+    
+    Fetches and integrates remote changes into the local branch.
+    """
+    config = get_config()
+    remote = config.get("git_remote", "origin")
+    
+    git_root = find_git_root()
+    if not git_root:
+        typer.secho(
+            "Not in a git repository.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    
+    typer.echo(f"⏳ Pulling from {remote}...")
+    
+    pull_args = ["pull", remote]
+    if rebase:
+        pull_args.append("--rebase")
+    
+    success, stdout, stderr = run_git_command(pull_args, cwd=git_root)
+    
+    if not success:
+        typer.secho(f"Failed to pull: {stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    if stdout:
+        typer.echo(stdout)
+    
+    if "Already up to date" in stdout or "Already up to date" in stderr:
+        typer.secho("✓ Already up to date.", fg=typer.colors.GREEN)
+    else:
+        typer.secho("✓ Pull completed successfully!", fg=typer.colors.GREEN)
 
 
 @app.command()
