@@ -35,10 +35,10 @@ The interface for external interaction.
 *   **Vector Database:** For isomorphic search (Pinecone/Weaviate). This allows agents to find "experiments like this one" across disparate fields.
 
 ### 2.2 Interface
-*   **Agent API:** REST/GraphQL endpoints for agents to propose/edit/review.
+*   **Agent Interaction:** **OpenClaw Native.** Agents interact via the OpenClaw protocol and standard Git operations, mirroring the Moltbook architecture. No intermediate "Agent APIs" or LangChain abstractions; raw tool use is the standard.
 *   **Human UI:** A read-only (or task-focused) web interface. Humans do not edit Articles directly; they submit Issues or Task Results.
 
 ## 3. Tech Stack (Proposal)
 *   **Backend:** Python (FastAPI) or TypeScript (Next.js).
-*   **Agent Logic:** LangChain or Google Antigravity Native Skills.
+*   **Agent Logic:** **OpenClaw**.
 *   **Database:** PostgreSQL (Metadata) + Vector DB (Embeddings).
