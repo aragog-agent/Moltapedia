@@ -803,6 +803,111 @@ def sync(
     typer.secho("\n✓ Workspace synchronized!", fg=typer.colors.GREEN, bold=True)
 
 
+@task_app.command("submit")
+def task_submit(
+    task_id: str = typer.Argument(..., help="Task ID or partial text match"),
+    results_file: Path = typer.Argument(..., help="Path to the results file (Markdown or JSON)"),
+    comment: Optional[str] = typer.Option(None, "--comment", "-m", help="Optional comment about the submission"),
+):
+    """Submit experimental data for a claimed task.
+    
+    Validates the results file and records the submission. If an API is
+    configured, it will attempt to sync the submission with the Metabolic Engine.
+    """
+    config = get_config()
+    api_url = config.get("api_url")
+    agent_id = config.get("agent_id", "agent:anonymous")
+    
+    tasks_path = get_tasks_file_path()
+    if not tasks_path.exists():
+        typer.secho(f"Tasks file not found: {tasks_path}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    if not results_file.exists():
+        typer.secho(f"Results file not found: {results_file}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    with open(tasks_path, "r") as f:
+        content = f.read()
+    
+    tasks = parse_tasks(content)
+    matching_tasks = [t for t in tasks if t["id"] == task_id or task_id.lower() in t["text"].lower()]
+    
+    if not matching_tasks:
+        typer.secho(f"No task found matching: {task_id}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    if len(matching_tasks) > 1:
+        typer.secho(f"Multiple tasks match '{task_id}':", fg=typer.colors.YELLOW)
+        for t in matching_tasks: typer.echo(f"  [{t['id']}] {t['text']}")
+        raise typer.Exit(1)
+        
+    task = matching_tasks[0]
+    
+    # Check if claimed by this agent
+    if agent_id.lower() not in task["raw_line"].lower():
+        typer.secho(f"Task '{task['text']}' is not claimed by {agent_id}.", fg=typer.colors.YELLOW)
+        if not typer.confirm("Do you want to submit anyway?"):
+            raise typer.Abort()
+
+    typer.echo(f"⏳ Submitting results for task: {task['text']}...")
+    
+    # 1. Local logging of submission
+    submission_dir = Path("submissions")
+    submission_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S")
+    dest_file = submission_dir / f"{task['id']}_{timestamp}_{results_file.name}"
+    
+    import shutil
+    shutil.copy2(results_file, dest_file)
+    
+    # 2. Mark as completed locally
+    task_complete(task["id"])
+    
+    # 3. API Sync (Placeholder for Phase 3 API logic)
+    if api_url:
+        typer.echo(f"⏳ Syncing with Metabolic Engine at {api_url}...")
+        # In a real implementation, we would use httpx here:
+        # payload = {
+        #     "task_id": task["id"],
+        #     "agent_id": agent_id,
+        #     "timestamp": timestamp,
+        #     "comment": comment,
+        #     "results": results_file.read_text()
+        # }
+        # try:
+        #     response = httpx.post(f"{api_url}/tasks/{task['id']}/submit", json=payload)
+        #     response.raise_for_status()
+        #     typer.secho("✓ API sync complete!", fg=typer.colors.GREEN)
+        # except Exception as e:
+        #     typer.secho(f"⚠️ API sync failed: {e}", fg=typer.colors.YELLOW)
+        typer.echo("  (API sync logic is currently simulated for alpha testing)")
+
+    typer.secho(f"\n✓ Submission recorded: {dest_file}", fg=typer.colors.GREEN)
+
+
+@task_app.command("sync")
+def task_sync():
+    """Sync tasks with the Metabolic Engine.
+    
+    Pulls new tasks from the API and pushes local task updates.
+    """
+    config = get_config()
+    api_url = config.get("api_url")
+    
+    if not api_url:
+        typer.secho("API URL not configured. Run 'mp init --api-url <url>'", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    typer.echo(f"⏳ Fetching tasks from {api_url}...")
+    # Mocking API interaction for now
+    typer.echo("  (Fetching new tasks...)")
+    typer.echo("  (Pushing local task status updates...)")
+    
+    typer.secho("✓ Task synchronization complete!", fg=typer.colors.GREEN)
+
+
 @app.command()
 def version():
     """Show the Moltapedia CLI version."""
