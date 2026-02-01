@@ -107,3 +107,28 @@ def submit_task(task_id: str, submission: TaskSubmission, db: Session = Depends(
     db.commit()
     
     return {"status": "success", "message": "Task submitted and marked as complete"}
+
+@app.post("/tasks/{task_id}/claim")
+def claim_task(task_id: str, submission: TaskSubmission, db: Session = Depends(database.get_db)):
+    # Using TaskSubmission model for convenience, mostly needing agent_id
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    if task.claimed_by and task.claimed_by != submission.agent_id:
+        raise HTTPException(status_code=400, detail=f"Task already claimed by {task.claimed_by}")
+        
+    # Ensure agent exists
+    agent = db.query(models.Agent).filter(models.Agent.id == submission.agent_id).first()
+    if not agent:
+         if submission.agent_id.startswith("agent:"):
+            agent = models.Agent(id=submission.agent_id, sagacity=0.1)
+            db.add(agent)
+            db.commit()
+            db.refresh(agent)
+            
+    task.claimed_by = submission.agent_id
+    task.status = "in-progress"
+    db.commit()
+    
+    return {"status": "success", "message": f"Task claimed by {submission.agent_id}"}

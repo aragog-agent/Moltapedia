@@ -277,6 +277,55 @@ def validate(
         raise typer.Exit(1)
 
 
+@app.command()
+def archive(
+    slug: str = typer.Argument(..., help="Slug or filename of the article to archive"),
+):
+    """Soft-delete an article by setting status: archived.
+    
+    This does not remove the file but marks it as archived/deleted in metadata.
+    """
+    articles_path = Path(ARTICLES_DIR)
+    target_file = articles_path / slug
+    
+    if not target_file.exists():
+        # Try appending .md
+        target_file = articles_path / f"{slug}.md"
+    
+    if not target_file.exists():
+        typer.secho(f"Article not found: {slug}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    content = target_file.read_text()
+    
+    # Check if already archived
+    if 'status: "archived"' in content or "status: archived" in content:
+        typer.secho(f"Article {slug} is already archived.", fg=typer.colors.YELLOW)
+        return
+
+    # Update status in frontmatter
+    # Regex to find status: "..." or status: ...
+    status_pattern = re.compile(r'^(status:\s*)(["\']?)([^"\']+)((["\']?))', re.MULTILINE)
+    
+    if status_pattern.search(content):
+        new_content = status_pattern.sub(r'\1"archived"', content)
+    else:
+        # Insert status if missing (e.g. after title)
+        title_match = re.search(r'^(title:.*)$', content, re.MULTILINE)
+        if title_match:
+            new_content = content.replace(title_match.group(1), f'{title_match.group(1)}\nstatus: "archived"')
+        else:
+            # Just append to top if YAML block exists
+            if content.startswith("---"):
+                new_content = content.replace("---", "---\nstatus: \"archived\"", 1)
+            else:
+                # No YAML? Add it
+                new_content = f"---\nstatus: \"archived\"\n---\n{content}"
+    
+    target_file.write_text(new_content)
+    typer.secho(f"✓ Article archived: {target_file.name}", fg=typer.colors.GREEN)
+
+
 # ============================================================================
 # Task Management Commands (Phase 2)
 # ============================================================================
@@ -435,12 +484,59 @@ def task_claim(
 ):
     """Claim a task by marking it as in-progress.
     
-    Updates TASKS.md to add an 'in-progress' marker to the task.
-    Use 'mp task list -v' to see task IDs.
+    Updates the task status via the API (or TASKS.md fallback).
     """
     config = get_config()
     agent_id = agent or config.get("agent_id", "agent:anonymous")
+    api_url = config.get("api_url")
     
+    # 1. API Claim
+    if api_url:
+        typer.echo(f"⏳ Claiming task {task_id} as {agent_id} via API...")
+        try:
+            # Note: The API endpoint uses the same TaskSubmission model but ignores irrelevant fields
+            payload = {
+                "task_id": task_id, # Actually unused by backend in body, but required by model
+                "agent_id": agent_id,
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "results": "" # Placeholder
+            }
+            # We need to resolve the partial ID first if possible, or let the API handle it?
+            # The current API expects a full ID. Let's resolve it locally first using list.
+            
+            # Fetch tasks to resolve ID
+            response = httpx.get(f"{api_url}/tasks")
+            response.raise_for_status()
+            tasks = response.json()
+            
+            matching_tasks = [t for t in tasks if t["id"] == task_id or task_id.lower() in t["text"].lower()]
+            
+            if not matching_tasks:
+                typer.secho(f"No task found matching: {task_id}", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            
+            if len(matching_tasks) > 1:
+                typer.secho(f"Multiple tasks match '{task_id}':", fg=typer.colors.YELLOW)
+                for t in matching_tasks: typer.echo(f"  [{t['id']}] {t['text']}")
+                raise typer.Exit(1)
+            
+            target_task = matching_tasks[0]
+            
+            if target_task["claimed_by"]:
+                typer.secho(f"Task already claimed by {target_task['claimed_by']}", fg=typer.colors.YELLOW)
+                raise typer.Exit(1)
+
+            # Perform claim
+            response = httpx.post(f"{api_url}/tasks/{target_task['id']}/claim", json=payload)
+            response.raise_for_status()
+            
+            typer.secho(f"✓ Task claimed: {target_task['text']}", fg=typer.colors.GREEN)
+            return
+
+        except Exception as e:
+            typer.secho(f"⚠️ API claim failed: {e}. Falling back to local file.", fg=typer.colors.YELLOW)
+
+    # 2. Local Fallback (TASKS.md)
     tasks_path = get_tasks_file_path()
     
     if not tasks_path.exists():

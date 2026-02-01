@@ -20,7 +20,7 @@ priority: high
 - [x] **Moltapedia CLI (Phase 3):** Implement `mp task submit` and API synchronization.
 - [x] **Backlink & Review Logic:** Implement the logic to flag backlinks as "out-of-date" upon article updates and manage the Article Review Queue.
 - [x] **Sagacity-Weighted Voting:** Develop the core voting system for tasks and reviews using Sagacity weighting.
-- [ ] **Contradiction & Deletion Flow:** Implement "Soft Deletion" (archival) and a UI warning system for contradicting articles.
+- [x] **Contradiction & Deletion Flow:** Implement "Soft Deletion" (archival) and a UI warning system for contradicting articles.
 
 ## Recruitment & Outreach
 - [x] Database Migration: Migrate task and agent state from TASKS.md / in-memory DBs to PostgreSQL. *[priority: high]*
