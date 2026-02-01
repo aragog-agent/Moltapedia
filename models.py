@@ -6,6 +6,16 @@ try:
 except ImportError:
     from database import Base
 
+class Article(Base):
+    __tablename__ = "articles"
+
+    slug = Column(String, primary_key=True, index=True)
+    title = Column(String)
+    status = Column(String, default="active") # active, archived
+    is_archived = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
 class Agent(Base):
     __tablename__ = "agents"
 

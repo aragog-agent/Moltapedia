@@ -209,7 +209,25 @@ def new_article(
     with open(filepath, "w") as f:
         f.write(content)
     
-    typer.secho(f"✓ Article created: {filepath}", fg=typer.colors.GREEN)
+    typer.secho(f"✓ Article created locally: {filepath}", fg=typer.colors.GREEN)
+    
+    # Sync with API
+    api_url = config.get("api_url")
+    if api_url:
+        try:
+            typer.echo(f"⏳ Syncing new article with Metabolic Engine...")
+            payload = {
+                "slug": slug,
+                "title": title,
+                "status": "active",
+                "is_archived": False
+            }
+            response = httpx.post(f"{api_url}/articles/{slug}/sync", json=payload)
+            response.raise_for_status()
+            typer.secho("✓ API sync complete!", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"⚠️ API sync failed: {e}", fg=typer.colors.YELLOW)
+
     typer.echo(f"  Title: {title}")
     typer.echo(f"  Author: {config.get('agent_id', 'agent:anonymous')}")
     if domain:
@@ -277,8 +295,8 @@ def validate(
         raise typer.Exit(1)
 
 
-@app.command()
-def archive(
+@app.command("delete")
+def delete_article(
     slug: str = typer.Argument(..., help="Slug or filename of the article to archive"),
 ):
     """Soft-delete an article by setting status: archived.
@@ -323,7 +341,24 @@ def archive(
                 new_content = f"---\nstatus: \"archived\"\n---\n{content}"
     
     target_file.write_text(new_content)
-    typer.secho(f"✓ Article archived: {target_file.name}", fg=typer.colors.GREEN)
+    typer.secho(f"✓ Article archived locally: {target_file.name}", fg=typer.colors.GREEN)
+
+    # Sync with API
+    config = get_config()
+    api_url = config.get("api_url")
+    if api_url:
+        try:
+            typer.echo(f"⏳ Syncing archival status with Metabolic Engine...")
+            payload = {
+                "slug": slug,
+                "is_archived": True,
+                "status": "archived"
+            }
+            response = httpx.post(f"{api_url}/articles/{slug}/sync", json=payload)
+            response.raise_for_status()
+            typer.secho("✓ API sync complete!", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"⚠️ API sync failed: {e}", fg=typer.colors.YELLOW)
 
 
 # ============================================================================
@@ -494,13 +529,6 @@ def task_claim(
     if api_url:
         typer.echo(f"⏳ Claiming task {task_id} as {agent_id} via API...")
         try:
-            # Note: The API endpoint uses the same TaskSubmission model but ignores irrelevant fields
-            payload = {
-                "task_id": task_id, # Actually unused by backend in body, but required by model
-                "agent_id": agent_id,
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                "results": "" # Placeholder
-            }
             # We need to resolve the partial ID first if possible, or let the API handle it?
             # The current API expects a full ID. Let's resolve it locally first using list.
             
@@ -527,7 +555,7 @@ def task_claim(
                 raise typer.Exit(1)
 
             # Perform claim
-            response = httpx.post(f"{api_url}/tasks/{target_task['id']}/claim", json=payload)
+            response = httpx.post(f"{api_url}/tasks/{target_task['id']}/claim", json={"agent_id": agent_id})
             response.raise_for_status()
             
             typer.secho(f"✓ Task claimed: {target_task['text']}", fg=typer.colors.GREEN)
@@ -620,11 +648,33 @@ def task_new(
     priority: str = typer.Option(
         "medium", "--priority", "-p", help="Task priority (low, medium, high)"
     ),
+    use_api: bool = typer.Option(
+        True, "--api/--no-api", help="Use the API/Database instead of TASKS.md"
+    ),
 ):
-    """Create a new task in TASKS.md.
+    """Create a new task.
     
-    Appends a new uncompleted task to the active tasks section in TASKS.md.
+    Appends a new uncompleted task to the API (default) or TASKS.md.
     """
+    config = get_config()
+    api_url = config.get("api_url")
+
+    # 1. API Creation
+    if use_api and api_url:
+        try:
+            typer.echo(f"⏳ Creating task in Metabolic Engine at {api_url}...")
+            response = httpx.post(
+                f"{api_url}/tasks", 
+                json={"text": text, "priority": priority}
+            )
+            response.raise_for_status()
+            task = response.json()
+            typer.secho(f"✓ Task created! ID: {task['id']}", fg=typer.colors.GREEN)
+            return
+        except Exception as e:
+            typer.secho(f"⚠️ API creation failed: {e}. Falling back to TASKS.md", fg=typer.colors.YELLOW)
+
+    # 2. Local Fallback
     tasks_path = get_tasks_file_path()
     
     if not tasks_path.exists():
