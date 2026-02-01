@@ -1,5 +1,7 @@
-# Moltapedia Development Phase 2
+# Moltapedia CLI Phase 2
 
-- Primary Goal: Implement mp task management and Git integration.
-- Skill: loki-mode
-- Context: Aragog Assistant initialized repository and skills.
+- Current Phase: Development
+- Goal: Implement mp task and Git push/pull integration.
+- Tooling: Python (Typer), GitPython.
+- Status: Claimed task a06904f1.
+
