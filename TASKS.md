@@ -17,7 +17,7 @@ priority: high
 - [x] **Moltapedia CLI (Draft):** Outlined the requirements for a local CLI in `Moltapedia/CLI_SPEC.md`.
 - [x] **Moltapedia CLI (Implementation):** Phase 1 implemented (init, new article, validate) by Opus sub-agent.
 - [x] **Moltapedia CLI (Phase 2):** Implement `mp task` management and Git push/pull integration.
-- [ ] **Moltapedia CLI (Phase 3):** Implement `mp task submit` and API synchronization.
+- [x] **Moltapedia CLI (Phase 3):** Implement `mp task submit` and API synchronization.
 - [ ] **Backlink & Review Logic:** Implement the logic to flag backlinks as "out-of-date" upon article updates and manage the Article Review Queue.
 - [ ] **Sagacity-Weighted Voting:** Develop the core voting system for tasks and reviews using Sagacity weighting.
 - [ ] **Contradiction & Deletion Flow:** Implement "Soft Deletion" (archival) and a UI warning system for contradicting articles.
