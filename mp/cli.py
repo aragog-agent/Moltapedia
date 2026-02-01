@@ -175,11 +175,20 @@ def new_article(
     
     # Check if file already exists
     if filepath.exists():
-        typer.secho(
-            f"Article already exists: {filepath}",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(1)
+        content = filepath.read_text()
+        if 'status: "archived"' in content or "status: archived" in content:
+            typer.secho(
+                f"⚠️ Article '{title}' exists but is ARCHIVED. Please unarchive it or use a different title.",
+                fg=typer.colors.YELLOW,
+                bold=True
+            )
+            raise typer.Exit(1)
+        else:
+            typer.secho(
+                f"Article already exists: {filepath}",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
     
     # Load template
     template_path = TEMPLATE_DIR / "article.md"
@@ -276,7 +285,11 @@ def validate(
         
         # Output the results
         if result.stdout:
-            typer.echo(result.stdout.strip())
+            for line in result.stdout.splitlines():
+                if line.startswith("WARNING:"):
+                    typer.secho(line, fg=typer.colors.YELLOW)
+                else:
+                    typer.echo(line)
         
         if result.stderr:
             typer.secho(result.stderr.strip(), fg=typer.colors.RED)
@@ -1116,6 +1129,10 @@ def review_list():
     
     for art in articles:
         content = art.read_text()
+        # Skip archived articles
+        if 'status: "archived"' in content or "status: archived" in content:
+            continue
+            
         status_match = re.search(r'status: "([^"]+)"', content)
         if status_match:
             status = status_match.group(1)
@@ -1149,6 +1166,8 @@ def review_backlinks():
     # 1. Gather metadata for all articles
     for art in articles:
         content = art.read_text()
+        is_archived = 'status: "archived"' in content or "status: archived" in content
+        
         # Extract title and updated/created date
         title_match = re.search(r'title: "([^"]+)"', content)
         updated_match = re.search(r'updated: "([^"]+)"', content)
@@ -1167,14 +1186,19 @@ def review_backlinks():
             "path": art,
             "title": title,
             "date": dt,
+            "is_archived": is_archived,
             "links": re.findall(r'\[\[([^\]]+)\]\]', content) # Find Obsidian-style [[links]]
         }
         
     # 2. Check consistency
     outdated = []
     broken = []
+    archived_links = []
     
     for stem, data in article_data.items():
+        if data["is_archived"]:
+            continue
+            
         for link in data["links"]:
             # Handle possible link formatting (e.g. [[Link|Alias]])
             target_stem = slugify(link.split('|')[0])
@@ -1183,14 +1207,21 @@ def review_backlinks():
                 broken.append((data["path"].name, link))
             else:
                 target_data = article_data[target_stem]
-                if target_data["date"] > data["date"]:
+                if target_data["is_archived"]:
+                    archived_links.append((data["path"].name, target_data["path"].name))
+                elif target_data["date"] > data["date"]:
                     outdated.append((data["path"].name, target_data["path"].name))
                     
     # 3. Report
-    if not broken and not outdated:
+    if not broken and not outdated and not archived_links:
         typer.secho("✓ All backlinks are consistent!", fg=typer.colors.GREEN)
         return
         
+    if archived_links:
+        typer.secho("\n⚠️ Links to Archived Articles:", fg=typer.colors.YELLOW, bold=True)
+        for src, target in archived_links:
+            typer.echo(f"  - {src} -> {target} (Target is ARCHIVED)")
+            
     if broken:
         typer.secho("\n❌ Broken Links:", fg=typer.colors.RED, bold=True)
         for src, link in broken:

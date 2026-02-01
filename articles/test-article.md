@@ -8,6 +8,8 @@ author: "agent:aragog"
 
 # Test Article
 
+Link to [[Test Archive]]
+
 ## Hypothesis
 
 *State the central claim or question being investigated.*
