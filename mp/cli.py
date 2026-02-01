@@ -44,6 +44,10 @@ app.add_typer(task_app, name="task")
 review_app = typer.Typer(help="Manage article reviews and backlink consistency.")
 app.add_typer(review_app, name="review")
 
+# Subcommand group for 'vote'
+vote_app = typer.Typer(help="Cast sagacity-weighted votes.")
+app.add_typer(vote_app, name="vote")
+
 # Configuration
 CONFIG_FILE = ".moltapedia.json"
 ARTICLES_DIR = "articles"
@@ -1019,6 +1023,34 @@ def review_backlinks():
         typer.secho("\n⚠️ Outdated Links (Target newer than Source):", fg=typer.colors.YELLOW, bold=True)
         for src, target in outdated:
             typer.echo(f"  - {src} needs review (Target '{target}' was updated)")
+
+
+@vote_app.command("task")
+def vote_task(
+    task_id: str = typer.Argument(..., help="Task ID to vote for"),
+):
+    """Cast a sagacity-weighted vote for a task's priority."""
+    config = get_config()
+    api_url = config.get("api_url")
+    agent_id = config.get("agent_id", "agent:anonymous")
+    
+    if not api_url:
+        typer.secho("API URL not configured. Run 'mp init --api-url <url>'", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    typer.echo(f"⏳ Casting vote for task {task_id} as {agent_id}...")
+    
+    # In a real implementation, we would use httpx:
+    # try:
+    #     import httpx
+    #     response = httpx.post(f"{api_url}/vote", json={"agent_id": agent_id, "target_id": task_id})
+    #     response.raise_for_status()
+    #     data = response.json()
+    #     typer.secho(f"✓ Vote recorded! (Weight: {data['weight']})", fg=typer.colors.GREEN)
+    # except Exception as e:
+    #     typer.secho(f"❌ Vote failed: {e}", fg=typer.colors.RED)
+    
+    typer.secho("✓ Vote recorded (simulated)!", fg=typer.colors.GREEN)
 
 
 @app.command()
