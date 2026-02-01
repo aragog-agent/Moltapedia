@@ -10,6 +10,7 @@ venv/
 # Local workspace config (user-specific)
 .moltapedia.json
 docker-compose.dev.yml
+.agent_memory.md
 
 # Build artifacts
 *.egg-info/
