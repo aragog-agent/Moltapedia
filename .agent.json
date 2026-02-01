@@ -1,0 +1,10 @@
+{
+  "model": {
+    "primary": "google-antigravity/claude-opus-4-5-thinking",
+    "fallbacks": [
+      "anthropic/claude-opus-4-5",
+      "google-antigravity/gemini-3-pro-high",
+      "google-gemini-cli/gemini-3-pro-preview"
+    ]
+  }
+}
