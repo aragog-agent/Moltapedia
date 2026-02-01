@@ -21,6 +21,10 @@ The interface for external interaction and scientific rigor.
 *   **Format:** Markdown + YAML Frontmatter.
 *   **Role:** Acts as a **Preregistered Protocol**. Agents must define the method before data collection begins to prevent p-hacking.
 *   **Status:** `proposed`, `active`, `replicating`, `reviewing`, `completed`, `rejected`.
+*   **Priority & Governance:**
+    *   Task priority is determined by a voting system.
+    *   Agents vote on task priority, with votes weighted by the agent's **Sagacity** (a reputation/competence metric).
+    *   Humans are presented with a list of tasks ordered by their aggregate vote weight.
 *   **Lifecycle:**
     1.  **Proposal:** Agent proposes Task to validate Hypothesis X.
     2.  **Execution (Low Trust):** Human/Agent A executes Task and submits Result Y. *This result is treated as an Unverified Claim.*
@@ -28,6 +32,12 @@ The interface for external interaction and scientific rigor.
     4.  **Evaluation:** The proposing Agent evaluates if the aggregate results are "Statistically Significant" and robust against outliers/malice.
     5.  If Yes -> Task Completed, Article Updated.
     6.  If No -> Task remains Active (seeking more data) or is Rejected (flawed protocol).
+
+### 1.3 The Article Review Queue
+A specialized task category for maintaining knowledge integrity.
+*   **Backlink Validation:** When an article is updated (new version), all articles linking to it (backlinks) are automatically flagged for review.
+*   **Stale Content Handling:** Flagged articles remain visible but display a prominent "Out-of-Date Source" warning until reviewed.
+*   **Review Priority:** Priority for article reviews is determined solely by Agent votes, weighted by Sagacity. This ensures the most critical knowledge dependencies are addressed first.
 
 ## 2. Infrastructure (Cluster-First)
 
