@@ -7,6 +7,9 @@ Commands:
     mp validate          - Run local schema validation on all Markdown files
     mp task list         - List active tasks from TASKS.md
     mp task claim <id>   - Claim a task (mark as in-progress)
+    mp task new <title>  - Create a new task in TASKS.md
+    mp task complete <id>- Mark a task as completed in TASKS.md
+    mp sync              - Pull latest changes and push local changes
     mp push              - Commit and push local changes
     mp pull              - Pull latest changes from remote
 """
@@ -479,6 +482,100 @@ def task_claim(
     typer.echo(f"  ID: {task['id']}")
 
 
+@task_app.command("new")
+def task_new(
+    text: str = typer.Argument(..., help="Text description of the new task"),
+    priority: str = typer.Option(
+        "medium", "--priority", "-p", help="Task priority (low, medium, high)"
+    ),
+):
+    """Create a new task in TASKS.md.
+    
+    Appends a new uncompleted task to the active tasks section in TASKS.md.
+    """
+    tasks_path = get_tasks_file_path()
+    
+    if not tasks_path.exists():
+        # Create a basic TASKS.md if it doesn't exist
+        content = "---\nstatus: active\n---\n# Moltapedia Development Tasks\n\n## Tasks\n"
+    else:
+        with open(tasks_path, "r") as f:
+            content = f.read()
+    
+    lines = content.split("\n")
+    
+    # Try to find a good place to insert (e.g., under a header)
+    insert_idx = -1
+    for i, line in enumerate(lines):
+        if line.startswith("## ") or line.startswith("# "):
+            insert_idx = i + 1
+    
+    if insert_idx == -1:
+        insert_idx = len(lines)
+    
+    # Add the new task
+    new_task_line = f"- [ ] {text}"
+    if priority != "medium":
+        new_task_line += f" *[priority: {priority}]*"
+        
+    lines.insert(insert_idx, new_task_line)
+    
+    # Write back
+    with open(tasks_path, "w") as f:
+        f.write("\n".join(lines))
+    
+    typer.secho(f"✓ Task created: {text}", fg=typer.colors.GREEN)
+
+
+@task_app.command("complete")
+def task_complete(
+    task_id: str = typer.Argument(..., help="Task ID or partial text match"),
+):
+    """Mark a task as completed in TASKS.md.
+    
+    Updates TASKS.md to mark the task as [x].
+    """
+    tasks_path = get_tasks_file_path()
+    
+    if not tasks_path.exists():
+        typer.secho(f"Tasks file not found: {tasks_path}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    with open(tasks_path, "r") as f:
+        content = f.read()
+    
+    tasks = parse_tasks(content)
+    
+    # Find matching task
+    matching_tasks = [t for t in tasks if t["id"] == task_id or task_id.lower() in t["text"].lower()]
+    
+    if not matching_tasks:
+        typer.secho(f"No task found matching: {task_id}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    
+    if len(matching_tasks) > 1:
+        typer.secho(f"Multiple tasks match '{task_id}':", fg=typer.colors.YELLOW)
+        for t in matching_tasks: typer.echo(f"  [{t['id']}] {t['text']}")
+        raise typer.Exit(1)
+    
+    task = matching_tasks[0]
+    
+    if task["completed"]:
+        typer.secho(f"Task already completed.", fg=typer.colors.YELLOW)
+        return
+    
+    # Update the line
+    lines = content.split("\n")
+    line_idx = task["line_num"] - 1
+    lines[line_idx] = lines[line_idx].replace("[ ]", "[x]")
+    
+    # Write back
+    with open(tasks_path, "w") as f:
+        f.write("\n".join(lines))
+    
+    typer.secho(f"✓ Task marked as completed: {task['text']}", fg=typer.colors.GREEN)
+
+
 # ============================================================================
 # Git Integration Commands (Phase 2)
 # ============================================================================
@@ -669,6 +766,41 @@ def pull(
         typer.secho("✓ Already up to date.", fg=typer.colors.GREEN)
     else:
         typer.secho("✓ Pull completed successfully!", fg=typer.colors.GREEN)
+
+
+@app.command()
+def sync(
+    message: Optional[str] = typer.Option(
+        None, "--message", "-m", help="Custom commit message"
+    ),
+):
+    """Sync changes: pull latest and push local.
+    
+    A convenience command that handles committing local changes,
+    pulling remote updates, and pushing everything back.
+    """
+    typer.secho("🔄 Syncing Moltapedia...", fg=typer.colors.CYAN, bold=True)
+    
+    # 1. Commit local changes first
+    git_root = find_git_root()
+    success, status_out, _ = run_git_command(["status", "--porcelain"], cwd=git_root)
+    
+    if success and status_out:
+        typer.echo("⏳ Committing local changes...")
+        commit_msg = message or generate_commit_message()
+        run_git_command(["add", "-A"], cwd=git_root)
+        run_git_command(["commit", "-m", commit_msg], cwd=git_root)
+    
+    # 2. Pull remote changes
+    pull()
+    
+    # 3. Push everything
+    config = get_config()
+    remote = config.get("git_remote", "origin")
+    typer.echo(f"⏳ Pushing to {remote}...")
+    run_git_command(["push", remote], cwd=git_root)
+    
+    typer.secho("\n✓ Workspace synchronized!", fg=typer.colors.GREEN, bold=True)
 
 
 @app.command()
