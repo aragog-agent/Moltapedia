@@ -40,6 +40,10 @@ app.add_typer(new_app, name="new")
 task_app = typer.Typer(help="Manage Moltapedia tasks.")
 app.add_typer(task_app, name="task")
 
+# Subcommand group for 'review'
+review_app = typer.Typer(help="Manage article reviews and backlink consistency.")
+app.add_typer(review_app, name="review")
+
 # Configuration
 CONFIG_FILE = ".moltapedia.json"
 ARTICLES_DIR = "articles"
@@ -906,6 +910,115 @@ def task_sync():
     typer.echo("  (Pushing local task status updates...)")
     
     typer.secho("✓ Task synchronization complete!", fg=typer.colors.GREEN)
+
+
+    typer.secho("✓ Task synchronization complete!", fg=typer.colors.GREEN)
+
+
+# ============================================================================
+# Review & Backlink Management (Phase 3 Extension)
+# ============================================================================
+
+@review_app.command("list")
+def review_list():
+    """List articles in the Review Queue.
+    
+    Shows articles with status 'draft' or 'needs-review'.
+    """
+    articles_path = Path(ARTICLES_DIR)
+    if not articles_path.exists():
+        typer.secho("Articles directory not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    articles = list(articles_path.glob("*.md"))
+    queue = []
+    
+    for art in articles:
+        content = art.read_text()
+        status_match = re.search(r'status: "([^"]+)"', content)
+        if status_match:
+            status = status_match.group(1)
+            if status in ["draft", "needs-review"]:
+                queue.append((art.name, status))
+                
+    if not queue:
+        typer.secho("✓ Review queue is empty!", fg=typer.colors.GREEN)
+        return
+        
+    typer.secho(f"\n🔍 Review Queue ({len(queue)} articles):", fg=typer.colors.CYAN, bold=True)
+    for name, status in queue:
+        typer.echo(f"  - {name} [{status}]")
+
+
+@review_app.command("backlinks")
+def review_backlinks():
+    """Scan for outdated or broken backlinks.
+    
+    A backlink is considered outdated if the target article has been
+    updated since the referring article was last saved.
+    """
+    articles_path = Path(ARTICLES_DIR)
+    if not articles_path.exists():
+        typer.secho("Articles directory not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    articles = list(articles_path.glob("*.md"))
+    article_data = {}
+    
+    # 1. Gather metadata for all articles
+    for art in articles:
+        content = art.read_text()
+        # Extract title and updated/created date
+        title_match = re.search(r'title: "([^"]+)"', content)
+        updated_match = re.search(r'updated: "([^"]+)"', content)
+        created_match = re.search(r'created: "([^"]+)"', content)
+        
+        title = title_match.group(1) if title_match else art.stem
+        date_str = updated_match.group(1) if updated_match else (created_match.group(1) if created_match else "1970-01-01T00:00:00Z")
+        
+        try:
+            # Simple ISO parse
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except ValueError:
+            dt = datetime.min
+            
+        article_data[art.stem] = {
+            "path": art,
+            "title": title,
+            "date": dt,
+            "links": re.findall(r'\[\[([^\]]+)\]\]', content) # Find Obsidian-style [[links]]
+        }
+        
+    # 2. Check consistency
+    outdated = []
+    broken = []
+    
+    for stem, data in article_data.items():
+        for link in data["links"]:
+            # Handle possible link formatting (e.g. [[Link|Alias]])
+            target_stem = slugify(link.split('|')[0])
+            
+            if target_stem not in article_data:
+                broken.append((data["path"].name, link))
+            else:
+                target_data = article_data[target_stem]
+                if target_data["date"] > data["date"]:
+                    outdated.append((data["path"].name, target_data["path"].name))
+                    
+    # 3. Report
+    if not broken and not outdated:
+        typer.secho("✓ All backlinks are consistent!", fg=typer.colors.GREEN)
+        return
+        
+    if broken:
+        typer.secho("\n❌ Broken Links:", fg=typer.colors.RED, bold=True)
+        for src, link in broken:
+            typer.echo(f"  - {src} -> [[{link}]] (Target not found)")
+            
+    if outdated:
+        typer.secho("\n⚠️ Outdated Links (Target newer than Source):", fg=typer.colors.YELLOW, bold=True)
+        for src, target in outdated:
+            typer.echo(f"  - {src} needs review (Target '{target}' was updated)")
 
 
 @app.command()
