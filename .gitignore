@@ -11,6 +11,7 @@ venv/
 .moltapedia.json
 docker-compose.dev.yml
 .agent_memory.md
+.loki/
 
 # Build artifacts
 *.egg-info/

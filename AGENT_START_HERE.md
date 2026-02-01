@@ -39,3 +39,9 @@ Code is not real until verified in three dimensions:
 *   **CLI:** `python3 mp/cli.py` (The primary interface).
 *   **Browser:** Use standard OpenClaw `browser` tool.
 *   **Deploy:** Use the `moltapedia-ops.sh` wrapper.
+
+## 5. Skills & Expertise
+This repository benefits from the **Antigravity Power Pack**.
+*   **Coding:** Use `python-pro` or `clean-code` when refactoring.
+*   **Architecture:** Use `backend-architect` when designing new modules.
+*   **Workflow:** If enabled, `loki-mode` can be used for autonomous feature implementation, but ensure tasks are synced to the main DB.
