@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Optional, List, Tuple
 
 import typer
+import httpx
 
 app = typer.Typer(
     name="mp",
@@ -349,12 +350,39 @@ def task_list(
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show task IDs and line numbers"
     ),
+    use_api: bool = typer.Option(
+        True, "--api/--no-api", help="Use the API/Database instead of TASKS.md"
+    ),
 ):
-    """List active tasks from TASKS.md.
+    """List active tasks.
     
-    Parses the TASKS.md file and displays all uncompleted tasks.
-    Use --all to include completed tasks as well.
+    Parses the API/Database (default) or TASKS.md file.
     """
+    config = get_config()
+    api_url = config.get("api_url")
+
+    if use_api and api_url:
+        try:
+            response = httpx.get(f"{api_url}/tasks")
+            response.raise_for_status()
+            tasks = response.json()
+            
+            if not all_tasks:
+                tasks = [t for t in tasks if not t["completed"]]
+            
+            if not tasks:
+                typer.secho("✓ All tasks completed (API)!", fg=typer.colors.GREEN)
+                return
+
+            typer.secho(f"\n📋 Active Tasks from API ({len(tasks)}):", fg=typer.colors.CYAN, bold=True)
+            for task in tasks:
+                prefix = f"  [{task['id']}] " if verbose else "  "
+                status = "[x]" if task['completed'] else "[ ]"
+                typer.echo(f"{prefix}{status} {task['text']}")
+            return
+        except Exception as e:
+            typer.secho(f"⚠️ API list failed: {e}. Falling back to TASKS.md", fg=typer.colors.YELLOW)
+
     tasks_path = get_tasks_file_path()
     
     if not tasks_path.exists():
@@ -816,6 +844,9 @@ def task_submit(
     task_id: str = typer.Argument(..., help="Task ID or partial text match"),
     results_file: Path = typer.Argument(..., help="Path to the results file (Markdown or JSON)"),
     comment: Optional[str] = typer.Option(None, "--comment", "-m", help="Optional comment about the submission"),
+    use_api: bool = typer.Option(
+        True, "--api/--no-api", help="Use the API/Database instead of local logging"
+    ),
 ):
     """Submit experimental data for a claimed task.
     
@@ -860,7 +891,7 @@ def task_submit(
 
     typer.echo(f"⏳ Submitting results for task: {task['text']}...")
     
-    # 1. Local logging of submission
+    # 1. Local logging of submission (fallback)
     submission_dir = Path("submissions")
     submission_dir.mkdir(exist_ok=True)
     
@@ -872,25 +903,25 @@ def task_submit(
     
     # 2. Mark as completed locally
     task_complete(task["id"])
-    
-    # 3. API Sync (Placeholder for Phase 3 API logic)
-    if api_url:
-        typer.echo(f"⏳ Syncing with Metabolic Engine at {api_url}...")
-        # In a real implementation, we would use httpx here:
-        # payload = {
-        #     "task_id": task["id"],
-        #     "agent_id": agent_id,
-        #     "timestamp": timestamp,
-        #     "comment": comment,
-        #     "results": results_file.read_text()
-        # }
-        # try:
-        #     response = httpx.post(f"{api_url}/tasks/{task['id']}/submit", json=payload)
-        #     response.raise_for_status()
-        #     typer.secho("✓ API sync complete!", fg=typer.colors.GREEN)
-        # except Exception as e:
-        #     typer.secho(f"⚠️ API sync failed: {e}", fg=typer.colors.YELLOW)
-        typer.echo("  (API sync logic is currently simulated for alpha testing)")
+
+    # 3. API Sync
+    if use_api and api_url:
+        try:
+            typer.echo(f"⏳ Syncing with Metabolic Engine at {api_url}...")
+            payload = {
+                "task_id": task["id"],
+                "agent_id": agent_id,
+                "timestamp": timestamp,
+                "comment": comment,
+                "results": results_file.read_text()
+            }
+            response = httpx.post(f"{api_url}/tasks/{task['id']}/submit", json=payload)
+            response.raise_for_status()
+            typer.secho("✓ API sync complete!", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"⚠️ API sync failed: {e}", fg=typer.colors.YELLOW)
+    else:
+        typer.echo("  (API sync skipped)")
 
     typer.secho(f"\n✓ Submission recorded: {dest_file}", fg=typer.colors.GREEN)
 
@@ -1040,17 +1071,13 @@ def vote_task(
         
     typer.echo(f"⏳ Casting vote for task {task_id} as {agent_id}...")
     
-    # In a real implementation, we would use httpx:
-    # try:
-    #     import httpx
-    #     response = httpx.post(f"{api_url}/vote", json={"agent_id": agent_id, "target_id": task_id})
-    #     response.raise_for_status()
-    #     data = response.json()
-    #     typer.secho(f"✓ Vote recorded! (Weight: {data['weight']})", fg=typer.colors.GREEN)
-    # except Exception as e:
-    #     typer.secho(f"❌ Vote failed: {e}", fg=typer.colors.RED)
-    
-    typer.secho("✓ Vote recorded (simulated)!", fg=typer.colors.GREEN)
+    try:
+        response = httpx.post(f"{api_url}/vote", json={"agent_id": agent_id, "target_id": task_id})
+        response.raise_for_status()
+        data = response.json()
+        typer.secho(f"✓ Vote recorded! (Weight: {data['weight']})", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"❌ Vote failed: {e}", fg=typer.colors.RED)
 
 
 @app.command()
