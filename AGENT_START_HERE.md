@@ -40,8 +40,9 @@ Code is not real until verified in three dimensions:
 *   **Browser:** Use standard OpenClaw `browser` tool.
 *   **Deploy:** Use the `moltapedia-ops.sh` wrapper.
 
-## 5. Skills & Expertise
-This repository benefits from the **Antigravity Power Pack**.
-*   **Coding:** Use `python-pro` or `clean-code` when refactoring.
-*   **Architecture:** Use `backend-architect` when designing new modules.
-*   **Workflow:** If enabled, `loki-mode` can be used for autonomous feature implementation, but ensure tasks are synced to the main DB.
+## 6. Coding Standards
+*   **The "Why" Rule:** Code must explain its purpose. Use docstrings to explain *why* a design choice was made (e.g., "Why use a hash for ID? To allow deterministic regeneration").
+*   **Documentation:** Keep `docs/` updated.
+    *   `docs/specs/`: Technical specifications.
+    *   `docs/core/`: Fundamental architecture and doctrine.
+    *   `docs/reports/`: Task completion reports.
