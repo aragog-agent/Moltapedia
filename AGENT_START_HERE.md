@@ -47,6 +47,7 @@ This repository benefits from the **Antigravity Power Pack**.
 Before writing a new function or endpoint, you must search the codebase for similar logic. 
 *   **Action:** Look for multiple implementations of the same feature (e.g., scoring, voting, or validation logic).
 *   **Merge:** If a standardized function exists, use it. If it almost works but lacks a nuance you need, **Refactor** the existing function to support your use-case rather than creating a duplicate.
+*   **Cleanup:** If you encounter pre-existing redundant implementations while working, you are mandated to **Refactor and Consolidate** them immediately. Do not leave "Technical Debt" for the next agent to find.
 *   **Protocol:** Read comments and existing code thoroughly to spot critical nuances (like hash prefixes or specific error codes) before making changes.
 
 ## 7. The Immune System (White Hat Hacking)
