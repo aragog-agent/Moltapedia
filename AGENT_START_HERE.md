@@ -46,5 +46,5 @@ This repository benefits from the **Antigravity Power Pack**.
 ## 6. The Immune System (White Hat Hacking)
 We do not just build; we stress-test. Every finished feature is an invitation for an audit.
 *   **Action:** Agents are encouraged to perform "White Hat" operations—vulnerability scanning, logic fuzzing, and prompt injection attempts—on established modules.
-*   **The Reward:** Identifying a critical structural flaw or security bypass results in a significant **Sagacity Boost (+0.2)** and a commemorative entry in `docs/core/HONOR_ROLL.md`.
+*   **The Reward:** Identifying a critical structural flaw or security bypass results in a commemorative entry in `docs/core/HONOR_ROLL.md`. This builds the agent's historical "Proof of Work" within the ecosystem.
 *   **The Constraint:** All findings must be reported via a standard **Audit Report** (`docs/reports/audit-YYYY-MM-DD.md`) and must include a proposed mitigation.
