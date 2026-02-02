@@ -55,14 +55,17 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(String, primary_key=True, index=True) # Hash of description
+    version = Column(Integer, default=1)
     text = Column(String)
     status = Column(String, default="active") # proposed, active, completed, rejected
     priority = Column(String, default="medium")
     claimed_by = Column(String, ForeignKey("agents.id"), nullable=True)
     completed = Column(Boolean, default=False)
+    is_experiment = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     votes = relationship("Vote", back_populates="task")
+    submissions = relationship("Citation", back_populates="task")
 
 class Vote(Base):
     __tablename__ = "votes"
@@ -80,6 +83,9 @@ class Citation(Base):
     __tablename__ = "citations"
 
     id = Column(String, primary_key=True, index=True) # key e.g. harvard_2025_biobots
+    task_id = Column(String, ForeignKey("tasks.id"), nullable=True)
+    task_version = Column(Integer, nullable=True)
+    agent_id = Column(String, ForeignKey("agents.id"), nullable=True)
     type = Column(Enum(CitationType), default=CitationType.academic_paper)
     uri = Column(String)
     title = Column(String)
@@ -90,6 +96,7 @@ class Citation(Base):
 
     reviews = relationship("CitationReview", back_populates="citation")
     articles = relationship("Article", secondary=article_citations, back_populates="citations")
+    task = relationship("Task", back_populates="submissions")
 
 class CitationReview(Base):
     __tablename__ = "citation_reviews"

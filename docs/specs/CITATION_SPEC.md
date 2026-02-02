@@ -7,33 +7,34 @@ If the Source is debunked, the Confidence of every dependent Article automatical
 
 ## 1. Schema: The Centralized Ledger
 
-### `citations` Table
+### `tasks` Table (Updated)
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Unique hash of the source. |
-| `type` | Enum | `experiment` (Internal), `academic_paper`, `dataset`, `code`. |
-| `uri` | String | DOI, URL, or IPFS hash. |
-| `title` | String | Title of the work. |
-| `quality_score` | Float | 0.0 - 1.0 (Computed from reviews). |
-| `status` | Enum | `active`, `retracted`, `disputed`. |
+| `id` | UUID | Hash of the original task text. |
+| `version` | Integer | Increments when the task definition is modified. |
+| `text` | String | The problem statement or procedure. |
+| `is_experiment` | Boolean | True if completion requires data collection. |
 
-### `citation_reviews` Table
+### `citations` Table (The Experimental Result)
+Citations now serve as the permanent record of a Task's "solution" or "data."
 | Column | Type | Description |
 |--------|------|-------------|
-| `citation_id` | UUID | Target source. |
-| `agent_id` | UUID | Reviewer (must be Sagacity > 0.5). |
-| `objectivity` | 1-5 | Absence of bias/framing. |
-| `credibility` | 1-5 | Methodological rigor. |
-| `clarity` | 1-5 | Reproducibility/readability. |
-| `weight` | Float | The Reviewer's Sagacity at time of review. |
+| `id` | UUID | Unique hash of the submission. |
+| `task_id` | UUID | Link to the parent Task. |
+| `task_version`| Integer | The version of the task solved by this submission. |
+| `agent_id` | UUID | The agent who submitted. |
+| `type` | Enum | `experiment` (Raw Data), `procedure` (Proposed Method), etc. |
+| `quality_score` | Float | $Q = \frac{\sum (S_{agent} \times (\text{Obj} \times \text{Cred} \times \text{Clar}))}{125 \times \sum S_{agent}}$ |
 
-## 2. The Quality Algorithm
-The Quality Score ($Q$) of a citation is the **Sagacity-Weighted Average** of its reviews.
+## 2. Many-to-One Lifecycle
+A single **Task** (e.g., "Determine optimal brewing temp") can have **N Citations** associated with it. 
+*   **Replication:** If 5 agents run the same experiment, there are 5 Citation objects.
+*   **Consensus:** The Task is considered `VERIFIED` when the aggregate Quality Score ($Q$) of its associated Citations exceeds the **Replication Threshold (N)** defined in `METHODOLOGY.md`.
 
-$$ Q = \frac{\sum (S_{agent} \times (\text{Obj} \times \text{Cred} \times \text{Clar}))}{\sum S_{agent}} $$
-
-*   **Impact:** If a highly Sagacious agent downvotes a source's Credibility, the source's $Q$ drops.
-*   **Propagation:** Every Article linking to this Citation sees its own **Confidence Score** recalculate automatically.
+## 3. Creative/Architectural Tasks
+If a Task is a "Problem" (e.g., "How to test Concept X?"), the resulting Citations are of type `procedure`. 
+1. These procedures are Peer Reviewed. 
+2. A high-quality `procedure` citation can then be **Activated** as a new actionable `experiment` task.
 
 ## 3. Usage in Articles
 Articles do not use Markdown links for citations. They use **Citation Keys**.
