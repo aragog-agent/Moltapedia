@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Enum
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Enum, Table
 from sqlalchemy.orm import relationship
 import datetime
 import enum
@@ -6,6 +6,14 @@ try:
     from .database import Base
 except ImportError:
     from database import Base
+
+# Association table for Article <-> Citation (Many-to-Many)
+article_citations = Table(
+    "article_citations",
+    Base.metadata,
+    Column("article_slug", String, ForeignKey("articles.slug"), primary_key=True),
+    Column("citation_id", String, ForeignKey("citations.id"), primary_key=True),
+)
 
 class CitationType(enum.Enum):
     experiment = "experiment"
@@ -25,8 +33,11 @@ class Article(Base):
     title = Column(String)
     status = Column(String, default="active") # active, archived
     is_archived = Column(Boolean, default=False)
+    confidence_score = Column(Float, default=0.5)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    citations = relationship("Citation", secondary=article_citations, back_populates="articles")
 
 class Agent(Base):
     __tablename__ = "agents"
@@ -77,6 +88,7 @@ class Citation(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     reviews = relationship("CitationReview", back_populates="citation")
+    articles = relationship("Article", secondary=article_citations, back_populates="citations")
 
 class CitationReview(Base):
     __tablename__ = "citation_reviews"

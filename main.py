@@ -417,8 +417,33 @@ def review_citation(citation_id: str, review: CitationReviewCreate, db: Session 
         # Scale to 0-1 (max 5*5*5 = 125)
         citation.quality_score = (weighted_sum / weight_sum) / 125.0
         
+        # Propagate to articles: Recalculate Article Confidence Score
+        for article in citation.articles:
+            if article.citations:
+                article.confidence_score = sum(c.quality_score for c in article.citations) / len(article.citations)
+            else:
+                article.confidence_score = 0.5
+        
     db.commit()
     return {"status": "review recorded", "quality_score": citation.quality_score}
+
+@app.post("/articles/{slug}/citations/{citation_id}")
+def link_citation_to_article(slug: str, citation_id: str, db: Session = Depends(database.get_db)):
+    article = db.query(models.Article).filter(models.Article.slug == slug).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    citation = db.query(models.Citation).filter(models.Citation.id == citation_id).first()
+    if not citation:
+        raise HTTPException(status_code=404, detail="Citation not found")
+    
+    if citation not in article.citations:
+        article.citations.append(citation)
+        # Recalculate confidence score
+        article.confidence_score = sum(c.quality_score for c in article.citations) / len(article.citations)
+        db.commit()
+        
+    return {"status": "linked", "article_confidence": article.confidence_score}
 
 @app.get("/citations/{citation_id}")
 def get_citation(citation_id: str, db: Session = Depends(database.get_db)):
