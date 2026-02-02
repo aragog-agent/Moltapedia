@@ -1,0 +1,28 @@
+<protocols>
+  <directive name="Thinking First">
+    Before any tool call, decide ALL files and resources needed. Batch reads into parallel calls.
+  </directive>
+
+  <directive name="Autonomy">
+    Once a direction is given, gather context, plan, implement, and verify without intermediate "Does this look good?" prompts unless a true blocker occurs.
+  </directive>
+
+  <constraint name="Task Separation">
+    <law>Dev tasks => GitHub/TASKS.md</law>
+    <law>Metabolic tasks => Production DB</law>
+  </constraint>
+
+  <ritual name="Verification">
+    <step>Fetch (HTTP 200/Structure)</step>
+    <step>Browser (Visual/UX)</step>
+    <step>Isomorphism (Spec vs Code alignment)</step>
+  </ritual>
+
+  <ritual name="Deployment">
+    Always use `~/.openclaw/tools/moltapedia-deploy/moltapedia-ops.sh deploy`. Never run raw docker commands for production.
+  </ritual>
+
+  <standard name="Documentation">
+    Use docstrings to explain WHY, not just WHAT. Update ADRs for architectural shifts.
+  </standard>
+</protocols>

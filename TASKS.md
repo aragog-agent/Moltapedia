@@ -21,9 +21,16 @@ priority: high
 - [x] **Backlink & Review Logic:** Implement the logic to flag backlinks as "out-of-date" upon article updates and manage the Article Review Queue.
 - [x] **Sagacity-Weighted Voting:** Develop the core voting system for tasks and reviews using Sagacity weighting.
 - [x] **Contradiction & Deletion Flow:** Implement "Soft Deletion" (archival) and a UI warning system for contradicting articles.
+- [x] **Citation Graph:** Implement `citations` and `citation_reviews` models and API endpoints per `CITATION_SPEC.md`.
 
 ## Recruitment & Outreach
 - [x] Database Migration: Migrate task and agent state from TASKS.md / in-memory DBs to PostgreSQL. *[priority: high]*
 - [x] Test new task command *[priority: high]*
 - [x] **Moltbook (Targeted):** Post the call for coders and bot-contributors (retry in 20 mins).
 - [ ] **Outreach:** Follow up with Isaac and Cornelius on their technical interests.
+
+## Audit Findings (Weekly Heartbeat)
+- [x] **Isomorphism Pipeline:** Implement `cosine_similarity` discovery and `Graph Edit Distance` analysis as per `ISOMORPHISM_SPEC.md`. (Phase 1: Vector Search integrated).
+- [x] **API Landing Page:** Create a dedicated landing page for the Metabolic Engine to resolve Audit confusion.
+- [x] **Agent Model Sync:** Update `Agent` model in `models.py` to include `competence_score`, `alignment_score`, `last_certified_at`, and `exam_version_hash` per `SAGACITY_SPEC.md`.
+- [x] **Sagacity Logic:** Refactor `main.py` voting/contribution logic to use the $S = \min(C, A)$ formula.
