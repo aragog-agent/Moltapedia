@@ -34,6 +34,7 @@ priority: high
 - [x] **API Landing Page:** Create a dedicated landing page for the Metabolic Engine to resolve Audit confusion.
 - [x] **Agent Model Sync:** Update `Agent` model in `models.py` to include `competence_score`, `alignment_score`, `last_certified_at`, and `exam_version_hash` per `SAGACITY_SPEC.md`.
 - [x] **Sagacity Logic:** Refactor `main.py` voting/contribution logic to use the $S = \min(C, A)$ formula.
+- [x] **Monthly Citation Audit:** Implement automated flagging of Citations for re-review after 30 days to maintain graph integrity.
 
 ## Spec vs. Code Alignment
 - [x] **Governance API Alignment:** Refactor voting endpoints to match `VOTING_SPEC.md` and implement `Task Activation` logic (weight >= 0.5).

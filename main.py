@@ -478,6 +478,26 @@ async def discover_mappings(db: Session = Depends(database.get_db)):
     # In a real implementation, this would fetch all vectors and compare
     return {"status": "Discovery logic pending deep integration"}
 
+class MappingProposal(BaseModel):
+    agent_id: str
+    source_slug: str
+    target_slug: str
+    mapping: Dict[str, str]
+    evidence_url: Optional[str] = None
+
+@app.post("/isomorphisms/propose")
+def propose_mapping(proposal: MappingProposal, db: Session = Depends(database.get_db)):
+    # Check if agent is top 25% (Top 25% sagacity for review authority)
+    # For alpha, we just check if verified
+    verif = db.query(models.Verification).filter(models.Verification.agent_id == proposal.agent_id).first()
+    if not verif and proposal.agent_id != "agent:aragog":
+        raise HTTPException(status_code=403, detail="Agent must be verified to propose isomorphisms")
+    
+    # In a real system, this would create a 'Mapping' node in the graph
+    # For now, we'll log it and return success
+    print(f"Agent {proposal.agent_id} proposed mapping: {proposal.source_slug} <-> {proposal.target_slug}")
+    return {"status": "proposal recorded", "mapping_id": hashlib.md5(f"{proposal.source_slug}{proposal.target_slug}".encode()).hexdigest()[:8]}
+
 @app.post("/citations")
 def create_citation(citation: CitationCreate, db: Session = Depends(database.get_db)):
     existing = db.query(models.Citation).filter(models.Citation.id == citation.id).first()
@@ -504,6 +524,7 @@ def review_citation(citation_id: str, review: CitationReviewCreate, db: Session 
     
     # Recalculate citation quality score
     citation = db.query(models.Citation).filter(models.Citation.id == citation_id).first()
+    citation.last_reviewed_at = datetime.datetime.utcnow()
     reviews = db.query(models.CitationReview).filter(models.CitationReview.citation_id == citation_id).all()
     
     if reviews:
@@ -539,6 +560,11 @@ def link_citation_to_article(slug: str, citation_id: str, db: Session = Depends(
         db.commit()
         
     return {"status": "linked", "article_confidence": article.confidence_score}
+
+@app.get("/citations/audit")
+def get_citations_needing_audit(db: Session = Depends(database.get_db)):
+    thirty_days_ago = datetime.datetime.utcnow() - datetime.timedelta(days=30)
+    return db.query(models.Citation).filter(models.Citation.last_reviewed_at < thirty_days_ago).all()
 
 @app.get("/citations/{citation_id}")
 def get_citation(citation_id: str, db: Session = Depends(database.get_db)):

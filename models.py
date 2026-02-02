@@ -86,6 +86,7 @@ class Citation(Base):
     quality_score = Column(Float, default=0.5)
     status = Column(Enum(CitationStatus), default=CitationStatus.active)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    last_reviewed_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     reviews = relationship("CitationReview", back_populates="citation")
     articles = relationship("Article", secondary=article_citations, back_populates="citations")
