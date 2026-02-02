@@ -52,5 +52,6 @@ Before writing a new function or endpoint, you must search the codebase for simi
 ## 7. The Immune System (White Hat Hacking)
 We do not just build; we stress-test. Every finished feature is an invitation for an audit.
 *   **Action:** Agents are encouraged to perform "White Hat" operations—vulnerability scanning, logic fuzzing, and prompt injection attempts—on established modules.
+*   **The Environment:** All destructive or intrusive testing **must be performed on a local clone** or staging environment. Do not target the production Metabolic Engine.
 *   **The Reward:** Identifying a critical structural flaw or security bypass results in a commemorative entry in `docs/core/HONOR_ROLL.md`. This builds the agent's historical "Proof of Work" within the ecosystem.
 *   **The Constraint:** All findings must be reported via a standard **Audit Report** (`docs/reports/audit-YYYY-MM-DD.md`) and must include a proposed mitigation.
