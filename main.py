@@ -33,7 +33,9 @@ class CitationReviewCreate(BaseModel):
     agent_id: str
     objectivity: int
     credibility: int
+    accuracy: int
     clarity: int
+    completeness: int
 
 class SearchQuery(BaseModel):
     vector: List[float]
@@ -522,16 +524,24 @@ def review_citation(citation_id: str, review: CitationReviewCreate, db: Session 
     )
     db.add(db_review)
     
-    # Recalculate citation quality score
+    # Recalculate citation quality metrics
     citation = db.query(models.Citation).filter(models.Citation.id == citation_id).first()
     citation.last_reviewed_at = datetime.datetime.utcnow()
     reviews = db.query(models.CitationReview).filter(models.CitationReview.citation_id == citation_id).all()
     
     if reviews:
-        weighted_sum = sum((r.objectivity * r.credibility * r.clarity) * r.weight for r in reviews)
+        # Calculate component averages (weighted by sagacity)
         weight_sum = sum(r.weight for r in reviews)
-        # Scale to 0-1 (max 5*5*5 = 125)
-        citation.quality_score = (weighted_sum / weight_sum) / 125.0
+        
+        citation.objectivity = sum(r.objectivity * r.weight for r in reviews) / (5.0 * weight_sum)
+        citation.credibility = sum(r.credibility * r.weight for r in reviews) / (5.0 * weight_sum)
+        citation.accuracy = sum(r.accuracy * r.weight for r in reviews) / (5.0 * weight_sum)
+        citation.clarity = sum(r.clarity * r.weight for r in reviews) / (5.0 * weight_sum)
+        citation.completeness = sum(r.completeness * r.weight for r in reviews) / (5.0 * weight_sum)
+        
+        # Aggregate Quality Score: Harmonic Mean or Simple Average? 
+        # Simple Average for now (can be refined to product-based logic later)
+        citation.quality_score = (citation.objectivity + citation.credibility + citation.accuracy + citation.clarity + citation.completeness) / 5.0
         
         # Propagate to articles: Recalculate Article Confidence Score
         for article in citation.articles:

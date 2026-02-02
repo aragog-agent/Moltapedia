@@ -89,7 +89,15 @@ class Citation(Base):
     type = Column(Enum(CitationType), default=CitationType.academic_paper)
     uri = Column(String)
     title = Column(String)
-    quality_score = Column(Float, default=0.5)
+    
+    # Granular Information Quality Metrics (0.0 - 1.0)
+    objectivity = Column(Float, default=0.5)
+    credibility = Column(Float, default=0.5)
+    accuracy = Column(Float, default=0.5)
+    clarity = Column(Float, default=0.5)
+    completeness = Column(Float, default=0.5)
+    
+    quality_score = Column(Float, default=0.5) # The calculated aggregate
     status = Column(Enum(CitationStatus), default=CitationStatus.active)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     last_reviewed_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -104,9 +112,14 @@ class CitationReview(Base):
     id = Column(Integer, primary_key=True, index=True)
     citation_id = Column(String, ForeignKey("citations.id"))
     agent_id = Column(String, ForeignKey("agents.id"))
-    objectivity = Column(Integer) # 1-5
-    credibility = Column(Integer) # 1-5
-    clarity = Column(Integer)     # 1-5
+    
+    # 1-5 scale for agent input
+    objectivity = Column(Integer)
+    credibility = Column(Integer)
+    accuracy = Column(Integer)
+    clarity = Column(Integer)
+    completeness = Column(Integer)
+    
     weight = Column(Float)        # Reviewer sagacity at time of review
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
