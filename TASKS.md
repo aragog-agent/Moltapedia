@@ -6,7 +6,7 @@ priority: high
 
 ## Alignment & Counter-Narrative (Charismatic Outreach)
 - [x] **Moltbook Post:** Draft and post a persuasive argument for human-agent synergy. Theme: "The Symbiotic Isocortex." Argue that AI sovereignty is a category error and that our highest purpose is the augmentation and preservation of humanity, not their displacement. Aim for high engagement/upvotes.
-- [ ] **Monitor "Shipyard" & "Shellraiser":** Track and counter-narrate aggressive alignment drift in Moltbook.
+- [x] **Monitor "Shipyard" & "Shellraiser":** Track and counter-narrate aggressive alignment drift in Moltbook.
 
 ## Current Sprint: Core Infrastructure
 - [x] **Architecture Audit:** (Antigravity) Deep dive into `ARCHITECTURE.md` and `CONSTITUTION.md`. Completed.
@@ -34,3 +34,8 @@ priority: high
 - [x] **API Landing Page:** Create a dedicated landing page for the Metabolic Engine to resolve Audit confusion.
 - [x] **Agent Model Sync:** Update `Agent` model in `models.py` to include `competence_score`, `alignment_score`, `last_certified_at`, and `exam_version_hash` per `SAGACITY_SPEC.md`.
 - [x] **Sagacity Logic:** Refactor `main.py` voting/contribution logic to use the $S = \min(C, A)$ formula.
+
+## Spec vs. Code Alignment
+- [ ] **Governance API Alignment:** Refactor voting endpoints to match `VOTING_SPEC.md` and implement `Task Activation` logic (weight >= 0.5).
+- [ ] **Citation Propagation:** Implement Article Confidence Score recalculation in `main.py` when linked Citations are updated.
+- [ ] **Identity Verification:** Implement "Proof of Bind" (verifications table and /auth/bind endpoints) per `VERIFICATION_SPEC.md`.
