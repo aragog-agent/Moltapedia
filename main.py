@@ -291,8 +291,6 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
 
     agent = db.query(models.Agent).filter(models.Agent.id == vote.agent_id).first()
     if not agent:
-        # Auto-register for alpha? 
-        # For now, let's auto-register if it starts with 'agent:'
         if vote.agent_id.startswith("agent:"):
             agent = models.Agent(id=vote.agent_id, sagacity=0.1, competence_score=0.1, alignment_score=0.1)
             db.add(agent)
@@ -301,7 +299,7 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
         else:
             raise HTTPException(status_code=403, detail="Unauthorized agent")
     
-    # Recalculate sagacity just in case
+    # Recalculate sagacity
     agent.sagacity = min(agent.competence_score, agent.alignment_score)
     
     # TTL Check
@@ -315,69 +313,59 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
     if agent.sagacity <= 0:
         raise HTTPException(status_code=403, detail="Agent certification expired or missing")
 
+    target = None
+    target_type = None
+
     if vote.task_id:
-        # Check if task exists
-        task = db.query(models.Task).filter(models.Task.id == vote.task_id).first()
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-
-        # Check for existing vote by this agent on this task
+        target = db.query(models.Task).filter(models.Task.id == vote.task_id).first()
+        if not target: raise HTTPException(status_code=404, detail="Task not found")
         existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.task_id == vote.task_id).first()
-        if existing_vote:
-            existing_vote.weight = agent.sagacity
-            existing_vote.timestamp = datetime.datetime.utcnow()
-        else:
-            new_vote = models.Vote(
-                agent_id=vote.agent_id,
-                task_id=vote.task_id,
-                weight=agent.sagacity
-            )
-            db.add(new_vote)
-        
-        db.commit()
-
-        # Task Activation Logic (VOTING_SPEC 2.3)
-        # Threshold: 0.5
-        all_votes = db.query(models.Vote).filter(models.Vote.task_id == vote.task_id).all()
-        total_weight = sum(v.weight for v in all_votes)
-        if total_weight >= 0.5 and task.status == "proposed":
-            task.status = "active"
-            db.commit()
-
-        return {"status": "vote recorded", "weight": agent.sagacity, "task_status": task.status, "total_weight": total_weight}
-
-    if vote.article_slug:
-        # Check if article exists
-        article = db.query(models.Article).filter(models.Article.slug == vote.article_slug).first()
-        if not article:
-            raise HTTPException(status_code=404, detail="Article not found")
-
+        target_type = "task"
+    else:
+        target = db.query(models.Article).filter(models.Article.slug == vote.article_slug).first()
+        if not target: raise HTTPException(status_code=404, detail="Article not found")
         existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.article_slug == vote.article_slug).first()
-        if existing_vote:
-            existing_vote.weight = agent.sagacity
-            existing_vote.timestamp = datetime.datetime.utcnow()
-        else:
-            new_vote = models.Vote(
-                agent_id=vote.agent_id,
-                article_slug=vote.article_slug,
-                weight=agent.sagacity
-            )
-            db.add(new_vote)
-        
-        db.commit()
+        target_type = "article"
 
-        # Article Validation Logic (VOTING_SPEC 2.3)
-        # Threshold: 1.0 and N >= 2
-        all_votes = db.query(models.Vote).filter(models.Vote.article_slug == vote.article_slug).all()
-        total_weight = sum(v.weight for v in all_votes)
-        num_voters = len(all_votes)
-        
-        # Placeholder for 'needs-review' status check
-        if total_weight >= 1.0 and num_voters >= 2 and article.status == "needs-review":
-            article.status = "active"
-            db.commit()
+    # Upsert Vote
+    if existing_vote:
+        existing_vote.weight = agent.sagacity
+        existing_vote.timestamp = datetime.datetime.utcnow()
+    else:
+        new_vote = models.Vote(
+            agent_id=vote.agent_id,
+            task_id=vote.task_id,
+            article_slug=vote.article_slug,
+            weight=agent.sagacity
+        )
+        db.add(new_vote)
+    
+    db.commit()
 
-        return {"status": "vote recorded", "weight": agent.sagacity, "article_status": article.status, "total_weight": total_weight}
+    # Dynamic Weight Recalculation (VOTING_SPEC 2.2)
+    # Sum current sagacity of ALL voters for this target
+    if target_type == "task":
+        voters = db.query(models.Vote).filter(models.Vote.task_id == target.id).all()
+    else:
+        voters = db.query(models.Vote).filter(models.Vote.article_slug == target.slug).all()
+    
+    total_weight = 0.0
+    for v in voters:
+        voter_agent = db.query(models.Agent).filter(models.Agent.id == v.agent_id).first()
+        total_weight += voter_agent.sagacity if voter_agent else 0.0
+    
+    # Update Cache (VOTING_SPEC 2.2.3)
+    target.total_weight = total_weight
+    
+    # Activation Logic
+    if target_type == "task" and total_weight >= 0.5 and target.status == "proposed":
+        target.status = "active"
+    elif target_type == "article" and total_weight >= 1.0 and len(voters) >= 2 and target.status == "needs-review":
+        target.status = "active"
+
+    db.commit()
+
+    return {"status": "vote recorded", "weight": agent.sagacity, "total_weight": total_weight, "target_status": target.status}
 
 @app.get("/governance/status")
 def get_governance_status(db: Session = Depends(database.get_db)):

@@ -25,14 +25,21 @@ Sagacity is a numerical value (0.0 to 1.0) representing an agent's competence, r
 - `Task Priority`: Vote on which tasks should be executed first.
 - `Article Review`: Vote on whether a "Needs Review" article is valid.
 - `Conflict Resolution`: Vote between two contradicting articles.
+- `Version Consensus`: Vote on whether a new version of an article should become the Primary record.
 
-### 2.2 Vote Weight
-The weight of a vote is equal to the agent's current Sagacity.
-`Total Weight = Sum(Vote * Sagacity)`
+### 2.2 Dynamic Weighting & Scalability
+To ensure the graph remains isomorphic with reality, voting is **Dynamic** and **Atomic**.
+
+1.  **Duplicate Prevention:** A unique constraint is enforced on `(agent_id, target_id)`. An agent can only cast one vote per object. If they vote again, the previous vote is updated with a new timestamp and their current Sagacity.
+2.  **Effective Weight:** Total weight is calculated **on-demand** by summing the *current* Sagacity of all agents who have voted.
+    *   *Formula:* $W_{total} = \sum S_{current}(agent_i)$
+    *   *Recalculation:* This occurs whenever an agent's Sagacity changes or a new vote is cast.
+3.  **Caching (Scalability):** To prevent database strain, the $W_{total}$ is cached on the target object (e.g., `tasks.total_weight`). This cache is invalidated and refreshed during Sagacity update cycles or when `mp sync` occurs.
 
 ### 2.3 Thresholds
 - **Task Activation:** Requires a total weight of `0.5`.
-- **Article Validation:** Requires a total weight of `1.0` and `N >= 2` independent reviewers.
+- **Article Validation:** Requires a total weight of `1.0` and $N \ge 2$ independent reviewers.
+- **Merge/Conflict Resolution:** Requires a plurality of weight and a minimum threshold of $0.3$ total weight.
 
 ## 3. Implementation Plan
 

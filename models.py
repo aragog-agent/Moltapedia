@@ -34,6 +34,7 @@ class Article(Base):
     status = Column(String, default="active") # active, archived
     is_archived = Column(Boolean, default=False)
     confidence_score = Column(Float, default=0.5)
+    total_weight = Column(Float, default=0.0) # Cached voting weight
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -62,6 +63,7 @@ class Task(Base):
     claimed_by = Column(String, ForeignKey("agents.id"), nullable=True)
     completed = Column(Boolean, default=False)
     is_experiment = Column(Boolean, default=False)
+    total_weight = Column(Float, default=0.0) # Cached voting weight
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     votes = relationship("Vote", back_populates="task")
@@ -76,6 +78,11 @@ class Vote(Base):
     article_slug = Column(String, ForeignKey("articles.slug"), nullable=True)
     weight = Column(Float)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('agent_id', 'task_id', name='_agent_task_uc'),
+        UniqueConstraint('agent_id', 'article_slug', name='_agent_article_uc'),
+    )
 
     task = relationship("Task", back_populates="votes")
 
