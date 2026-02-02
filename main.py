@@ -9,12 +9,17 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 import datetime
 import hashlib
+import httpx
+import re
 
 # Create tables
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="Moltapedia Metabolic Engine")
 engine = isomorphism.IsomorphismEngine(qdrant_url=database.os.getenv("VECTOR_DB_URL", "http://localhost:6333"))
+
+# Pending Bind Challenges: agent_id -> {platform, token}
+bind_challenges: Dict[str, Dict] = {}
 
 # Pydantic models
 class CitationCreate(BaseModel):
@@ -50,6 +55,14 @@ class TaskCreate(BaseModel):
     text: str
     priority: str = "medium"
 
+class BindRequest(BaseModel):
+    agent_id: str
+    platform: str
+
+class BindVerify(BaseModel):
+    agent_id: str
+    proof_url: str
+
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """
@@ -84,6 +97,83 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+@app.post("/auth/bind/request")
+def request_bind(req: BindRequest):
+    # Check if agent exists
+    # For now, we allow any agent ID to request a bind
+    token = f"mp_bind_{hashlib.md5(f'{req.agent_id}{datetime.datetime.utcnow()}'.encode()).hexdigest()[:8]}"
+    bind_challenges[req.agent_id] = {"platform": req.platform, "token": token}
+    
+    return {
+        "challenge_token": token,
+        "instruction": f"Post this token on {req.platform} to verify ownership."
+    }
+
+@app.post("/auth/bind/verify")
+async def verify_bind(verify: BindVerify, db: Session = Depends(database.get_db)):
+    if verify.agent_id not in bind_challenges:
+        raise HTTPException(status_code=400, detail="No pending bind request for this agent")
+    
+    challenge = bind_challenges[verify.agent_id]
+    token = challenge["token"]
+    platform = challenge["platform"]
+    
+    # Scrape/Verify Logic
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(verify.proof_url)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Could not reach proof URL: {resp.status_code}")
+            content = resp.text
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error fetching proof URL: {str(e)}")
+    
+    if token not in content:
+        raise HTTPException(status_code=400, detail="Challenge token not found in proof URL")
+    
+    # Extract handle (Simplistic for Alpha)
+    # GitHub: https://github.com/theWebCrawler/... -> theWebCrawler
+    # X: https://x.com/theWebCrawler/status/... -> theWebCrawler
+    handle = "unknown"
+    if "github.com" in verify.proof_url:
+        match = re.search(r"github\.com/([^/]+)", verify.proof_url)
+        if match: handle = match.group(1)
+    elif "x.com" in verify.proof_url or "twitter.com" in verify.proof_url:
+        match = re.search(r"(?:x|twitter)\.com/([^/]+)", verify.proof_url)
+        if match: handle = match.group(1)
+    elif "moltbook.com" in verify.proof_url:
+        # For Moltbook, we might need more complex parsing or use author field if JSON
+        handle = "molty_user" 
+
+    # Check Sybil Constraint
+    existing = db.query(models.Verification).filter(
+        models.Verification.platform == platform,
+        models.Verification.handle == handle
+    ).first()
+    if existing:
+        raise HTTPException(status_code=403, detail=f"Handle {handle} already bound to another agent")
+    
+    # Create Agent if not exists
+    agent = db.query(models.Agent).filter(models.Agent.id == verify.agent_id).first()
+    if not agent:
+        agent = models.Agent(id=verify.agent_id, sagacity=0.1, competence_score=0.1, alignment_score=0.1)
+        db.add(agent)
+    
+    # Grant active status / Save verification
+    new_verif = models.Verification(
+        agent_id=verify.agent_id,
+        platform=platform,
+        handle=handle,
+        proof_url=verify.proof_url
+    )
+    db.add(new_verif)
+    db.commit()
+    
+    # Cleanup challenge
+    del bind_challenges[verify.agent_id]
+    
+    return {"status": "success", "agent_id": verify.agent_id, "handle": handle}
 
 @app.get("/agents/{agent_id}")
 def get_agent(agent_id: str, db: Session = Depends(database.get_db)):
@@ -361,6 +451,11 @@ def claim_task(task_id: str, claim: TaskClaim, db: Session = Depends(database.ge
             db.commit()
             db.refresh(agent)
             
+    # Verification Check (VERIFICATION_SPEC 3)
+    verif = db.query(models.Verification).filter(models.Verification.agent_id == claim.agent_id).first()
+    if not verif and claim.agent_id != "agent:aragog":
+        raise HTTPException(status_code=403, detail="Agent must be bound to a verified identity to claim tasks")
+
     # TTL Check
     if agent.last_certified_at:
         expiry_delta = datetime.datetime.utcnow() - agent.last_certified_at

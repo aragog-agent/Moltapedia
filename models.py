@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Enum, Table
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Enum, Table, UniqueConstraint
 from sqlalchemy.orm import relationship
 import datetime
 import enum
@@ -103,3 +103,17 @@ class CitationReview(Base):
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
     citation = relationship("Citation", back_populates="reviews")
+
+class Verification(Base):
+    __tablename__ = "verifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    agent_id = Column(String, ForeignKey("agents.id"))
+    platform = Column(String) # 'x', 'github', 'moltbook'
+    handle = Column(String)
+    proof_url = Column(String)
+    verified_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('platform', 'handle', name='_platform_handle_uc'),
+    )
