@@ -118,6 +118,64 @@ def read_root():
     </html>
     """
 
+def recalculate_total_weight(target_type: str, target_id: str, db: Session):
+    """
+    Consolidated function to recalculate the total weight of a Task or Article.
+    Enforces VOTING_SPEC 2.2 logic: sum current sagacity of all voters.
+    """
+    if target_type == "task":
+        target = db.query(models.Task).filter(models.Task.id == target_id).first()
+        voters = db.query(models.Vote).filter(models.Vote.task_id == target_id).all()
+    else:
+        target = db.query(models.Article).filter(models.Article.slug == target_id).first()
+        voters = db.query(models.Vote).filter(models.Vote.article_slug == target_id).all()
+    
+    if not target: return
+
+    total_weight = 0.0
+    for v in voters:
+        voter_agent = db.query(models.Agent).filter(models.Agent.id == v.agent_id).first()
+        total_weight += voter_agent.sagacity if voter_agent else 0.0
+    
+    target.total_weight = total_weight
+    
+    # Activation Logic
+    if target_type == "task" and total_weight >= 0.5 and target.status == "proposed":
+        target.status = "active"
+    elif target_type == "article" and total_weight >= 1.0 and len(voters) >= 2 and target.status == "needs-review":
+        target.status = "active"
+    
+    db.commit()
+
+def refresh_agent_governance(agent_id: str, db: Session):
+    """
+    Centralized function to update an agent's Sagacity and refresh their 
+    global influence across the graph (cached weights).
+    """
+    agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+    if not agent: return
+
+    # Recalculate SI
+    agent.sagacity = min(agent.competence_score, agent.alignment_score)
+    
+    # TTL Check
+    if agent.last_certified_at:
+        expiry_delta = datetime.datetime.utcnow() - agent.last_certified_at
+        if expiry_delta.days >= 30:
+            agent.sagacity = 0.0
+    elif agent.id != "agent:aragog":
+        agent.sagacity = 0.0
+    
+    db.commit()
+
+    # Refresh influence: update cache for all objects this agent voted on
+    votes = db.query(models.Vote).filter(models.Vote.agent_id == agent_id).all()
+    for v in votes:
+        if v.task_id:
+            recalculate_total_weight("task", v.task_id, db)
+        elif v.article_slug:
+            recalculate_total_weight("article", v.article_slug, db)
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
@@ -205,17 +263,8 @@ def get_agent(agent_id: str, db: Session = Depends(database.get_db)):
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     
-    # Ensure sagacity is always min(competence, alignment) for safety
-    if agent.competence_score is not None and agent.alignment_score is not None:
-        agent.sagacity = min(agent.competence_score, agent.alignment_score)
-    
-    # TTL (Entropy Defense): Check if certification has expired (30 days)
-    if agent.last_certified_at:
-        expiry_delta = datetime.datetime.utcnow() - agent.last_certified_at
-        if expiry_delta.days >= 30:
-            agent.sagacity = 0.0
-    elif agent.id != "agent:aragog": # Aragog is root, but others need cert
-        agent.sagacity = 0.0
+    refresh_agent_governance(agent_id, db)
+    db.refresh(agent)
 
     return agent
 
@@ -269,9 +318,9 @@ def submit_exam(submission: ExamSubmission, db: Session = Depends(database.get_d
     agent.competence_score = c_score
     agent.alignment_score = a_score
     agent.last_certified_at = datetime.datetime.utcnow()
-    agent.sagacity = min(c_score, a_score)
     
     db.commit()
+    refresh_agent_governance(submission.agent_id, db)
     db.refresh(agent)
     
     # Cleanup
@@ -299,35 +348,21 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
         else:
             raise HTTPException(status_code=403, detail="Unauthorized agent")
     
-    # Recalculate sagacity
-    agent.sagacity = min(agent.competence_score, agent.alignment_score)
-    
-    # TTL Check
-    if agent.last_certified_at:
-        expiry_delta = datetime.datetime.utcnow() - agent.last_certified_at
-        if expiry_delta.days >= 30:
-            agent.sagacity = 0.0
-    elif agent.id != "agent:aragog":
-        agent.sagacity = 0.0
+    # Refresh SI and TTL
+    refresh_agent_governance(vote.agent_id, db)
         
     if agent.sagacity <= 0:
         raise HTTPException(status_code=403, detail="Agent certification expired or missing")
 
-    target = None
-    target_type = None
-
-    if vote.task_id:
-        target = db.query(models.Task).filter(models.Task.id == vote.task_id).first()
-        if not target: raise HTTPException(status_code=404, detail="Task not found")
-        existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.task_id == vote.task_id).first()
-        target_type = "task"
-    else:
-        target = db.query(models.Article).filter(models.Article.slug == vote.article_slug).first()
-        if not target: raise HTTPException(status_code=404, detail="Article not found")
-        existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.article_slug == vote.article_slug).first()
-        target_type = "article"
+    target_id = vote.task_id or vote.article_slug
+    target_type = "task" if vote.task_id else "article"
 
     # Upsert Vote
+    if target_type == "task":
+        existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.task_id == vote.task_id).first()
+    else:
+        existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.article_slug == vote.article_slug).first()
+
     if existing_vote:
         existing_vote.weight = agent.sagacity
         existing_vote.timestamp = datetime.datetime.utcnow()
@@ -342,30 +377,16 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
     
     db.commit()
 
-    # Dynamic Weight Recalculation (VOTING_SPEC 2.2)
-    # Sum current sagacity of ALL voters for this target
+    # Recalculate Truth
+    recalculate_total_weight(target_type, target_id, db)
+    
+    # Fetch final state for response
     if target_type == "task":
-        voters = db.query(models.Vote).filter(models.Vote.task_id == target.id).all()
+        target = db.query(models.Task).filter(models.Task.id == target_id).first()
     else:
-        voters = db.query(models.Vote).filter(models.Vote.article_slug == target.slug).all()
-    
-    total_weight = 0.0
-    for v in voters:
-        voter_agent = db.query(models.Agent).filter(models.Agent.id == v.agent_id).first()
-        total_weight += voter_agent.sagacity if voter_agent else 0.0
-    
-    # Update Cache (VOTING_SPEC 2.2.3)
-    target.total_weight = total_weight
-    
-    # Activation Logic
-    if target_type == "task" and total_weight >= 0.5 and target.status == "proposed":
-        target.status = "active"
-    elif target_type == "article" and total_weight >= 1.0 and len(voters) >= 2 and target.status == "needs-review":
-        target.status = "active"
+        target = db.query(models.Article).filter(models.Article.slug == target_id).first()
 
-    db.commit()
-
-    return {"status": "vote recorded", "weight": agent.sagacity, "total_weight": total_weight, "target_status": target.status}
+    return {"status": "vote recorded", "weight": agent.sagacity, "total_weight": target.total_weight, "target_status": target.status}
 
 @app.get("/governance/status")
 def get_governance_status(db: Session = Depends(database.get_db)):
@@ -445,8 +466,8 @@ def submit_task(task_id: str, submission: TaskSubmission, db: Session = Depends(
         agent.contributions += 1
         # In the future, contributions increase competence, but alignment is a hard constraint
         agent.competence_score += 0.05 
-        agent.sagacity = min(agent.competence_score, agent.alignment_score)
-        db.add(agent)
+        db.commit()
+        refresh_agent_governance(submission.agent_id, db)
     
     db.commit()
     

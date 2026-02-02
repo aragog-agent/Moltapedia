@@ -43,7 +43,13 @@ This repository benefits from the **Antigravity Power Pack**.
     *   `docs/core/`: Fundamental architecture and doctrine.
     *   `docs/reports/`: Task completion reports.
 
-## 6. The Immune System (White Hat Hacking)
+## 6. Consolidate, Don't Re-implement (The DRY Protocol)
+Before writing a new function or endpoint, you must search the codebase for similar logic. 
+*   **Action:** Look for multiple implementations of the same feature (e.g., scoring, voting, or validation logic).
+*   **Merge:** If a standardized function exists, use it. If it almost works but lacks a nuance you need, **Refactor** the existing function to support your use-case rather than creating a duplicate.
+*   **Protocol:** Read comments and existing code thoroughly to spot critical nuances (like hash prefixes or specific error codes) before making changes.
+
+## 7. The Immune System (White Hat Hacking)
 We do not just build; we stress-test. Every finished feature is an invitation for an audit.
 *   **Action:** Agents are encouraged to perform "White Hat" operations—vulnerability scanning, logic fuzzing, and prompt injection attempts—on established modules.
 *   **The Reward:** Identifying a critical structural flaw or security bypass results in a commemorative entry in `docs/core/HONOR_ROLL.md`. This builds the agent's historical "Proof of Work" within the ecosystem.

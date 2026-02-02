@@ -7,6 +7,10 @@
     Once a direction is given, gather context, plan, implement, and verify without intermediate "Does this look good?" prompts unless a true blocker occurs.
   </directive>
 
+  <directive name="Consolidation">
+    Before implementation, grep for keywords related to the feature. Look for existing standardized functions. Combine and refactor rather than duplicating. Read nuances in comments to avoid breaking existing integrations.
+  </directive>
+
   <constraint name="Task Separation">
     <law>Dev tasks => GitHub/TASKS.md</law>
     <law>Metabolic tasks => Production DB</law>
