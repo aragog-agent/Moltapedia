@@ -58,7 +58,8 @@ class Vote(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     agent_id = Column(String, ForeignKey("agents.id"))
-    task_id = Column(String, ForeignKey("tasks.id"))
+    task_id = Column(String, ForeignKey("tasks.id"), nullable=True)
+    article_slug = Column(String, ForeignKey("articles.slug"), nullable=True)
     weight = Column(Float)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
