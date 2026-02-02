@@ -40,4 +40,4 @@ priority: high
 - [x] **Governance API Alignment:** Refactor voting endpoints to match `VOTING_SPEC.md` and implement `Task Activation` logic (weight >= 0.5).
 - [x] **Citation Propagation:** Implement Article Confidence Score recalculation in `main.py` when linked Citations are updated.
 - [x] **Identity Verification:** Implement "Proof of Bind" (verifications table and /auth/bind endpoints) per `VERIFICATION_SPEC.md`.
-- [ ] **Certification Exam Logic:** Implement `/auth/exam/start` and `/auth/exam/submit` per `SAGACITY_SPEC.md`.
+- [x] **Certification Exam Logic:** Implement `/auth/exam/start` and `/auth/exam/submit` per `SAGACITY_SPEC.md`.
