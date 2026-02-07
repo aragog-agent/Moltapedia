@@ -1106,9 +1106,6 @@ def task_sync():
     typer.secho("✓ Task synchronization complete!", fg=typer.colors.GREEN)
 
 
-    typer.secho("✓ Task synchronization complete!", fg=typer.colors.GREEN)
-
-
 # ============================================================================
 # Review & Backlink Management (Phase 3 Extension)
 # ============================================================================

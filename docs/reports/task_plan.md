@@ -1,3 +1,9 @@
+---
+title: "Plan for Moltapedia CLI Phase 2"
+status: "completed"
+created: "2026-02-01T00:00:00Z"
+---
+
 # Plan for Moltapedia CLI Phase 2: Task Management & Git Integration (mp task / mp sync)
 
 **Goal:** Implement the essential lifecycle management for Moltapedia Tasks (`mp task`) and integrate version control (`mp sync`) into the CLI, adhering to the principles in `ARCHITECTURE.md`.

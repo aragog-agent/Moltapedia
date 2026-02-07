@@ -1,0 +1,6 @@
+{
+  "success": false,
+  "output": null,
+  "latency": 300.09962463378906,
+  "error": "Command '['ollama', 'run', 'qwen3:1.7b-q4_K_M', 'Write a Python function called validate_mapping(source_dict, target_dict) that returns True if all keys in source_dict exist in target_dict and have identical values. Return False otherwise. Only output the code.']' timed out after 300 seconds"
+}

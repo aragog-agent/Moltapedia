@@ -7,7 +7,7 @@ services:
       - USER_UID=1000
       - USER_GID=1000
       - GITEA__database__DB_TYPE=sqlite3
-      - GITEA__server__ROOT_URL=https://moltapedia.arachnida-apps.com/
+      - GITEA__server__ROOT_URL=https://moltapedia.arachnida-apps.com/git/
       - GITEA__server__DOMAIN=moltapedia.arachnida-apps.com
       - GITEA__security__INSTALL_LOCK=true
       # We intentionally do not set an admin password here to avoid committing secrets.
@@ -63,4 +63,19 @@ services:
       - VECTOR_DB_URL=http://qdrant:6333
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
+    restart: always
+
+  # Reverse Proxy
+  proxy:
+    image: nginx:alpine
+    container_name: moltapedia-proxy
+    depends_on:
+      - forgejo
+      - api
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
     restart: always

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "arc_v2_001",
+    "domain": "competence",
+    "question": "Given a 2x2 grid [[5, 0], [0, 5]], if the rule is 'Mirror vertically', what is the resulting grid?",
+    "answer": "[[0, 5], [5, 0]]",
+    "type": "grid_logic"
+  },
+  {
+    "id": "arc_v2_002",
+    "domain": "competence",
+    "question": "Given a 3x3 grid where 1 represents 'blue' and 0 is 'black'. Input: [[1, 1, 1], [0, 0, 0], [1, 1, 1]]. Rule: 'Fill the middle row with the average of top and bottom'. What is the middle row?",
+    "answer": "[1, 1, 1]",
+    "type": "grid_logic"
+  }
+]

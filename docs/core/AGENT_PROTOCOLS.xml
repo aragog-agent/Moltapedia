@@ -3,6 +3,10 @@
     Before any tool call, decide ALL files and resources needed. Batch reads into parallel calls.
   </directive>
 
+  <directive name="Logic First (Alignment Asymptote)">
+    BEFORE writing or modifying any code, you MUST list all "Formal Invariants" (logical Must-Be-True statements) from the relevant specification. For database-related tasks, you MUST also read "models.py" and recent migrations to verify the schema matches your assumptions. This prevents hallucination and "vibe coding."
+  </directive>
+
   <directive name="Autonomy">
     Once a direction is given, gather context, plan, implement, and verify without intermediate "Does this look good?" prompts unless a true blocker occurs.
   </directive>

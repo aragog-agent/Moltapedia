@@ -8,3 +8,5 @@ python-dotenv
 GitPython
 typer
 httpx
+python-multipart
+deepeval

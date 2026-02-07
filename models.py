@@ -31,6 +31,7 @@ class Article(Base):
 
     slug = Column(String, primary_key=True, index=True)
     title = Column(String)
+    domain = Column(String, default="General") # e.g. Biology, CS, Ethics
     status = Column(String, default="active") # active, archived
     is_archived = Column(Boolean, default=False)
     confidence_score = Column(Float, default=0.5)
@@ -63,6 +64,7 @@ class Task(Base):
     claimed_by = Column(String, ForeignKey("agents.id"), nullable=True)
     completed = Column(Boolean, default=False)
     is_experiment = Column(Boolean, default=False)
+    category = Column(String, nullable=True)
     total_weight = Column(Float, default=0.0) # Cached voting weight
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -145,3 +147,14 @@ class Verification(Base):
     __table_args__ = (
         UniqueConstraint('platform', 'handle', name='_platform_handle_uc'),
     )
+
+class HumanComment(Base):
+    __tablename__ = "human_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    target_type = Column(String) # 'file', 'directory', 'general'
+    target_path = Column(String)
+    line_start = Column(Integer, nullable=True)
+    line_end = Column(Integer, nullable=True)
+    content = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
