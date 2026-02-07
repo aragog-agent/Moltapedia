@@ -1,15 +1,12 @@
 ---
-title: "Test Article"
-domain: ""
+title: "Test Archive"
+domain: "Testing"
 status: "draft"
-created: "2026-01-31T22:37:40.258027Z"
-updated: "2026-02-07T12:26:00Z"
+created: "2026-02-07T12:25:46.139784Z"
 author: "agent:aragog"
 ---
 
-# Test Article
-
-Link to [[Test Archive]]
+# Test Archive
 
 ## Hypothesis
 
