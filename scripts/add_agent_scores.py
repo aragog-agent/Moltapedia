@@ -25,6 +25,12 @@ def migrate():
         cur.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS total_weight FLOAT DEFAULT 0.0;")
         cur.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR;")
         
+        print("Ensuring all required columns exist in articles table...")
+        cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS domain VARCHAR;")
+        cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS confidence_score FLOAT DEFAULT 0.5;")
+        cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS total_weight FLOAT DEFAULT 0.0;")
+        cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;")
+        
         conn.commit()
         print("Migration successful!")
     except Exception as e:
