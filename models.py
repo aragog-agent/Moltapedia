@@ -71,6 +71,7 @@ class Task(Base):
 
     votes = relationship("Vote", back_populates="task")
     submissions = relationship("TaskSubmission", back_populates="task")
+    citations = relationship("Citation", back_populates="task")
 
 class TaskSubmission(Base):
     __tablename__ = "task_submissions"
@@ -127,7 +128,7 @@ class Citation(Base):
 
     reviews = relationship("CitationReview", back_populates="citation")
     articles = relationship("Article", secondary=article_citations, back_populates="citations")
-    task = relationship("Task", back_populates="submissions")
+    task = relationship("Task", back_populates="citations")
 
 class CitationReview(Base):
     __tablename__ = "citation_reviews"
