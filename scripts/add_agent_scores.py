@@ -23,6 +23,7 @@ def migrate():
         cur.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1;")
         cur.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_experiment BOOLEAN DEFAULT FALSE;")
         cur.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS total_weight FLOAT DEFAULT 0.0;")
+        cur.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR;")
         
         conn.commit()
         print("Migration successful!")
