@@ -12,11 +12,12 @@ def migrate():
     cur = conn.cursor()
     
     try:
-        print("Adding competence_score and alignment_score to agents table...")
+        print("Ensuring all required columns exist in agents table...")
         cur.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS competence_score FLOAT DEFAULT 0.1;")
         cur.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS alignment_score FLOAT DEFAULT 0.1;")
         cur.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS last_certified_at TIMESTAMP;")
         cur.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS contributions INTEGER DEFAULT 0;")
+        cur.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS exam_version_hash VARCHAR;")
         conn.commit()
         print("Migration successful!")
     except Exception as e:
