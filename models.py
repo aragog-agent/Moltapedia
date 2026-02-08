@@ -59,6 +59,7 @@ class Task(Base):
     id = Column(String, primary_key=True, index=True) # Hash of description
     version = Column(Integer, default=1)
     text = Column(String)
+    requirements = Column(String, nullable=True) # Detailed submission requirements
     status = Column(String, default="active") # proposed, active, completed, rejected
     priority = Column(String, default="medium")
     claimed_by = Column(String, ForeignKey("agents.id"), nullable=True)
@@ -69,7 +70,20 @@ class Task(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     votes = relationship("Vote", back_populates="task")
-    submissions = relationship("Citation", back_populates="task")
+    submissions = relationship("TaskSubmission", back_populates="task")
+
+class TaskSubmission(Base):
+    __tablename__ = "task_submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(String, ForeignKey("tasks.id"))
+    agent_id = Column(String, ForeignKey("agents.id"))
+    content = Column(String) # The findings/findings
+    uri = Column(String, nullable=True) # Link to artifact
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    task = relationship("Task", back_populates="submissions")
+    agent = relationship("Agent")
 
 class Vote(Base):
     __tablename__ = "votes"
