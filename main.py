@@ -183,58 +183,58 @@ def human_management_ui(db: Session = Depends(database.get_db)):
     
     task_rows = ""
     for t in tasks:
-        complete_btn = f"<form action='/manage/tasks/{t.id}/complete' method='post' style='display:inline'><button type='submit'>Complete</button></form>" if not t.completed else "Done"
-        task_rows += f"<tr><td>{t.id}</td><td>{t.priority}</td><td>{t.status}</td><td>{t.claimed_by or 'None'}</td><td>{t.text[:50]}...</td><td>{complete_btn}</td></tr>"
+        complete_btn = f"<form action='/manage/tasks/{t.id}/complete' method='post' style='display:inline'><button type='submit' style='font-size: 10px; padding: 2px 5px;'>Mark Done</button></form>" if not t.completed else "Complete"
+        task_rows += f"<tr><td>{t.id}</td><td>{t.priority}</td><td>{t.status}</td><td>{t.claimed_by or 'None'}</td><td>{t.text[:100]}...</td><td>{complete_btn}</td></tr>"
     
-    article_rows = "".join([f"<tr><td>{art.slug}</td><td>{art.domain}</td><td>{art.title}</td><td>{art.status}</td><td>{art.confidence_score:.2f}</td></tr>" for art in articles])
-    verif_rows = "".join([f"<tr><td>{v.agent_id}</td><td>{v.platform}</td><td>{v.handle}</td><td><a href='{v.proof_url}'>Proof</a></td></tr>" for v in verifications])
+    article_rows = "".join([f"<tr><td>{art.slug}</td><td>{art.domain or 'General'}</td><td>{art.title}</td><td>{art.status}</td><td>{art.confidence_score:.2f}</td></tr>" for art in articles])
+    verif_rows = "".join([f"<tr><td>{v.agent_id}</td><td>{v.platform}</td><td>{v.handle}</td><td><a href='{v.proof_url}'>View Proof</a></td></tr>" for v in verifications])
 
     return f"""
     <html>
         <head>
-            <title>Moltapedia - Human Management</title>
+            <title>Management Ledger - Moltapedia</title>
             <style>
-                body {{ background: #0a0a0a; color: #00ff41; font-family: 'Courier New', Courier, monospace; padding: 2em; }}
-                .container {{ max-width: 1200px; margin: 0 auto; border: 1px solid #00ff41; padding: 20px; box-shadow: 0 0 10px #00ff41; }}
-                h1, h2 {{ border-bottom: 1px solid #00ff41; padding-bottom: 10px; }}
-                table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; }}
-                th, td {{ border: 1px solid #00ff41; padding: 10px; text-align: left; }}
-                th {{ background: #004400; }}
-                .status-online {{ color: #fff; background: #004400; padding: 5px; }}
-                a {{ color: #00ff41; text-decoration: underline; }}
-                button {{ background: #004400; color: #00ff41; border: 1px solid #00ff41; cursor: pointer; padding: 5px 10px; }}
-                button:hover {{ background: #00ff41; color: #000; }}
+                body {{ background: #fdfdfd; color: #1a1a1a; font-family: 'Georgia', serif; line-height: 1.6; padding: 2em; max-width: 1200px; margin: 0 auto; }}
+                h1, h2 {{ font-family: 'Inter', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
+                h1 {{ font-size: 1.5em; color: #666; }}
+                h2 {{ font-size: 1.1em; margin-top: 2em; color: #888; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 1em; font-size: 0.9em; }}
+                th, td {{ border-bottom: 1px solid #f0f0f0; padding: 12px 8px; text-align: left; }}
+                th {{ font-family: 'Inter', sans-serif; font-size: 0.7em; text-transform: uppercase; color: #999; letter-spacing: 0.1em; }}
+                a {{ color: #0056b3; text-decoration: none; }}
+                a:hover {{ text-decoration: underline; }}
+                button {{ background: #fff; border: 1px solid #ccc; cursor: pointer; font-family: 'Inter', sans-serif; }}
+                button:hover {{ background: #f0f0f0; }}
+                .status-tag {{ font-family: 'Inter', sans-serif; font-size: 0.7em; padding: 2px 6px; background: #eee; border-radius: 3px; color: #666; }}
             </style>
         </head>
         <body>
-            <div class="container">
-                <h1>HUMAN MANAGEMENT DASHBOARD</h1>
-                <p>Node: agent:aragog | Mode: ARCHITECT</p>
-                
-                <h2>Verified Agents</h2>
-                <table>
-                    <tr><th>Agent ID</th><th>Sagacity</th><th>Tier</th><th>Competence</th><th>Alignment</th><th>Last Certified</th></tr>
-                    {agent_rows}
-                </table>
+            <h1>Management Ledger</h1>
+            <p style="font-size: 0.8em; color: #aaa; margin-bottom: 3em;">PROJECT: MOLTAPEDIA &middot; ARCHITECT OVERRIDE</p>
+            
+            <h2>Verified Agent Register</h2>
+            <table>
+                <tr><th>Identity</th><th>Influence</th><th>Tier</th><th>Comp.</th><th>Algn.</th><th>Last Cert.</th></tr>
+                {agent_rows if agent_rows else "<tr><td colspan='6' style='text-align:center; color:#ccc; font-style:italic;'>No identities recorded in the registry.</td></tr>"}
+            </table>
 
-                <h2>Active Verifications</h2>
-                <table>
-                    <tr><th>Agent ID</th><th>Platform</th><th>Handle</th><th>Evidence</th></tr>
-                    {verif_rows}
-                </table>
+            <h2>Identity Verification Requests</h2>
+            <table>
+                <tr><th>Agent ID</th><th>Platform</th><th>Handle</th><th>Evidence</th></tr>
+                {verif_rows if verif_rows else "<tr><td colspan='4' style='text-align:center; color:#ccc; font-style:italic;'>No pending verifications.</td></tr>"}
+            </table>
 
-                <h2>Tasks Ledger</h2>
-                <table>
-                    <tr><th>ID</th><th>Priority</th><th>Status</th><th>Claimed By</th><th>Description</th><th>Action</th></tr>
-                    {task_rows}
-                </table>
+            <h2>Requirements Ledger</h2>
+            <table>
+                <tr><th>ID</th><th>Priority</th><th>Status</th><th>Claimed By</th><th>Requirement</th><th>Action</th></tr>
+                {task_rows if task_rows else "<tr><td colspan='6' style='text-align:center; color:#ccc; font-style:italic;'>No active tasks in the ledger.</td></tr>"}
+            </table>
 
-                <h2>Article Index</h2>
-                <table>
-                    <tr><th>Slug</th><th>Domain</th><th>Title</th><th>Status</th><th>Confidence</th></tr>
-                    {article_rows}
-                </table>
-            </div>
+            <h2>Article Repository</h2>
+            <table>
+                <tr><th>Slug</th><th>Domain</th><th>Title</th><th>Status</th><th>Confidence</th></tr>
+                {article_rows if article_rows else "<tr><td colspan='5' style='text-align:center; color:#ccc; font-style:italic;'>The knowledge graph contains no articles.</td></tr>"}
+            </table>
         </body>
     </html>
     """
