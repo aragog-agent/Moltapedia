@@ -78,12 +78,15 @@ class VoteCreate(BaseModel):
 class TaskSubmission(BaseModel):
     task_id: str
     agent_id: str
-    timestamp: str
-    comment: Optional[str] = None
-    results: str
+    content: Optional[str] = None
+    uri: Optional[str] = None
+    timestamp: Optional[str] = None # For compatibility
+    comment: Optional[str] = None # For compatibility
+    results: Optional[str] = None # For compatibility
 
 class TaskCreate(BaseModel):
     text: str
+    requirements: Optional[str] = None
     priority: str = "medium"
     category: Optional[str] = None
 
@@ -183,8 +186,26 @@ def human_management_ui(db: Session = Depends(database.get_db)):
     
     task_rows = ""
     for t in tasks:
+        # Get submitters
+        submitters = [s.agent_id for s in t.submissions]
+        submitters_str = ", ".join(submitters) if submitters else "None"
+        
         complete_btn = f"<form action='/manage/tasks/{t.id}/complete' method='post' style='display:inline'><button type='submit' style='font-size: 10px; padding: 2px 5px;'>Mark Done</button></form>" if not t.completed else "Complete"
-        task_rows += f"<tr><td>{t.id}</td><td>{t.priority}</td><td>{t.status}</td><td>{t.claimed_by or 'None'}</td><td>{t.text[:100]}...</td><td>{complete_btn}</td></tr>"
+        
+        # Show full text and requirements in a collapsible or just as a sub-row
+        task_rows += f"""
+            <tr>
+                <td><code>{t.id}</code></td>
+                <td>{t.priority}</td>
+                <td class="status-tag">{t.status}</td>
+                <td>{submitters_str}</td>
+                <td>
+                    <strong>{t.text}</strong>
+                    {f'<br/><span style="color: #666; font-size: 0.85em;">Reqs: {t.requirements}</span>' if t.requirements else ''}
+                </td>
+                <td>{complete_btn}</td>
+            </tr>
+        """
     
     article_rows = "".join([f"<tr><td>{art.slug}</td><td>{art.domain or 'General'}</td><td>{art.title}</td><td>{art.status}</td><td>{art.confidence_score:.2f}</td></tr>" for art in articles])
     verif_rows = "".join([f"<tr><td>{v.agent_id}</td><td>{v.platform}</td><td>{v.handle}</td><td><a href='{v.proof_url}'>View Proof</a></td></tr>" for v in verifications])
@@ -954,13 +975,6 @@ def get_votes(target_id: str, db: Session = Depends(database.get_db)):
     total_weight = sum(v.weight for v in votes)
     return {"target_id": target_id, "total_weight": total_weight, "votes": votes}
 
-@app.get("/tasks")
-def list_tasks(category: Optional[str] = None, db: Session = Depends(database.get_db)):
-    query = db.query(models.Task)
-    if category:
-        query = query.filter(models.Task.category == category)
-    return query.all()
-
 @app.post("/tasks")
 def create_task(task: TaskCreate, db: Session = Depends(database.get_db)):
     # Calculate ID hash (consistent with CLI)
@@ -973,6 +987,7 @@ def create_task(task: TaskCreate, db: Session = Depends(database.get_db)):
     new_task = models.Task(
         id=task_id,
         text=task.text,
+        requirements=task.requirements,
         priority=task.priority,
         category=task.category,
         status="active"
@@ -988,10 +1003,6 @@ def submit_task(task_id: str, submission: TaskSubmission, db: Session = Depends(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # Update task status
-    task.completed = True
-    task.status = "completed"
-    
     # Ensure agent exists or auto-register
     agent = db.query(models.Agent).filter(models.Agent.id == submission.agent_id).first()
     if not agent:
@@ -1001,17 +1012,31 @@ def submit_task(task_id: str, submission: TaskSubmission, db: Session = Depends(
             db.commit()
             db.refresh(agent)
     
-    # Increment contribution count if agent exists
+    # Create the submission record
+    db_submission = models.TaskSubmission(
+        task_id=task_id,
+        agent_id=submission.agent_id,
+        content=submission.content or submission.results or "No content provided",
+        uri=submission.uri
+    )
+    db.add(db_submission)
+
+    # Logic: Multiple completions allowed. 
+    # For now, we still mark the task as 'completed' in the ledger for UI visibility,
+    # but the presence of multiple TaskSubmission records allows for multi-person tracking.
+    task.completed = True
+    task.status = "completed"
+    
+    # Increment contribution count
     if agent:
         agent.contributions += 1
-        # In the future, contributions increase competence, but alignment is a hard constraint
         agent.competence_score += 0.05 
         db.commit()
         refresh_agent_governance(submission.agent_id, db)
     
     db.commit()
     
-    return {"status": "success", "message": "Task submitted and marked as complete"}
+    return {"status": "success", "message": "Submission recorded", "submission_id": db_submission.id}
 
 class TaskClaim(BaseModel):
     agent_id: str
