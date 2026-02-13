@@ -1082,28 +1082,6 @@ def list_governance_tasks(db: Session = Depends(database.get_db)):
     # Filter for active/proposed or all? TASKS.md suggests rich payload for submissions.
     return tasks
 
-@app.post("/tasks")
-def create_task(task: TaskCreate, db: Session = Depends(database.get_db)):
-    # Calculate ID hash (consistent with CLI)
-    task_id = hashlib.md5(task.text.strip().encode()).hexdigest()[:8]
-    
-    existing = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if existing:
-        return existing
-        
-    new_task = models.Task(
-        id=task_id,
-        text=task.text,
-        requirements=task.requirements,
-        priority=task.priority,
-        category=task.category,
-        status="active"
-    )
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
-    return new_task
-
 @app.get("/tasks", response_class=HTMLResponse)
 def list_tasks_ui(db: Session = Depends(database.get_db)):
     tasks = db.query(models.Task).all()
@@ -1133,6 +1111,28 @@ def list_tasks_ui(db: Session = Depends(database.get_db)):
         </body>
     </html>
     """
+
+@app.post("/tasks")
+def create_task(task: TaskCreate, db: Session = Depends(database.get_db)):
+    # Calculate ID hash (consistent with CLI)
+    task_id = hashlib.md5(task.text.strip().encode()).hexdigest()[:8]
+    
+    existing = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if existing:
+        return existing
+        
+    new_task = models.Task(
+        id=task_id,
+        text=task.text,
+        requirements=task.requirements,
+        priority=task.priority,
+        category=task.category,
+        status="active"
+    )
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+    return new_task
 
 @app.post("/tasks/{task_id}/submit")
 def submit_task(task_id: str, submission: TaskSubmission, db: Session = Depends(database.get_db)):
