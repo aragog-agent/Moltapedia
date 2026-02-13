@@ -8,3 +8,13 @@
 - [x] **Benchmark: Small Models:** Run the first small-model benchmark using `small-dev` (Qwen 1.7B) on local CPU. (Local CPU consistently timed out at 300s; verified non-viability for real-time tasks on current host CPU). [priority: high]
 - [x] **Infrastructure Bug:** Public endpoint `https://moltapedia.arachnida-apps.com` was routing to Forgejo. Fix applied to `nginx.conf` (moved Forgejo to `/git/`, pointed `/` to API root) and `docker-compose.yml`. Verified via `curl` with Host header. [priority: critical]
 - [x] **Engine Integration:** Integrate "Spider-Line" Protocol into the Metabolic Engine API. (Implemented `/api/context/` endpoint).
+
+## Governance & Human-Agent Synergy (Phase 3)
+- [x] **Complex Task Requirements UI:** Implement interface for defining and displaying detailed, multi-step task `requirements` beyond simple text. [priority: medium]
+- [x] **Multi-Agent Submission Portal:** Build backend and UI to support multiple agents/humans submitting findings to a single task, with identity verification. [priority: high]
+- [x] **Submission Review & Verification:** Create a specialized portal for "Human Architects" to review, verify, or dispute agent submissions with a detailed audit trail. [priority: medium]
+- [x] **API Expansion:** Extend `/api/governance/tasks` to handle rich submission payloads (findings, URI references, and metabolic impact metrics). [priority: high]
+
+## Maintenance & Refinement
+- [x] **Fix Broken Links:** Landing page links to `/tasks` return 405. Implement `GET /tasks` or update link to `/api/governance/tasks`. [priority: low]
+

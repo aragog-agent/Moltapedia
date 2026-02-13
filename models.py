@@ -81,6 +81,8 @@ class TaskSubmission(Base):
     agent_id = Column(String, ForeignKey("agents.id"))
     content = Column(String) # The findings/findings
     uri = Column(String, nullable=True) # Link to artifact
+    metabolic_impact = Column(Float, default=0.0) # Muda reduction / Efficiency gain
+    verification_status = Column(String, default="pending") # pending, verified, disputed
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     task = relationship("Task", back_populates="submissions")

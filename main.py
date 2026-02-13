@@ -80,6 +80,8 @@ class TaskSubmission(BaseModel):
     agent_id: str
     content: Optional[str] = None
     uri: Optional[str] = None
+    metabolic_impact: Optional[float] = 0.0
+    verification_status: Optional[str] = "pending"
     timestamp: Optional[str] = None # For compatibility
     comment: Optional[str] = None # For compatibility
     results: Optional[str] = None # For compatibility
@@ -172,6 +174,43 @@ def manual_complete_task(task_id: str, db: Session = Depends(database.get_db)):
     db.commit()
     return HTMLResponse("<script>window.location.href='/manage'</script>")
 
+@app.post("/manage/submissions/{sub_id}/verify")
+def verify_submission(sub_id: int, db: Session = Depends(database.get_db)):
+    sub = db.query(models.TaskSubmission).filter(models.TaskSubmission.id == sub_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    if sub.verification_status != "verified":
+        sub.verification_status = "verified"
+        # Sagacity Accrual (VOTING_SPEC 1.2): +0.05 per verified task contribution
+        agent = db.query(models.Agent).filter(models.Agent.id == sub.agent_id).first()
+        if agent:
+            agent.competence_score = min(1.0, agent.competence_score + 0.05)
+            db.commit()
+            refresh_agent_governance(sub.agent_id, db)
+            
+    db.commit()
+    return HTMLResponse("<script>window.location.href='/manage'</script>")
+
+@app.post("/manage/submissions/{sub_id}/dispute")
+def dispute_submission(sub_id: int, db: Session = Depends(database.get_db)):
+    sub = db.query(models.TaskSubmission).filter(models.TaskSubmission.id == sub_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    if sub.verification_status != "disputed":
+        sub.verification_status = "disputed"
+        # Sagacity Penalty (VOTING_SPEC 1.3): Malicious/False Data penalty
+        agent = db.query(models.Agent).filter(models.Agent.id == sub.agent_id).first()
+        if agent:
+            # Penalty: -0.1 to alignment for false data
+            agent.alignment_score = max(0.0, agent.alignment_score - 0.1)
+            db.commit()
+            refresh_agent_governance(sub.agent_id, db)
+            
+    db.commit()
+    return HTMLResponse("<script>window.location.href='/manage'</script>")
+
 @app.get("/manage", response_class=HTMLResponse)
 def human_management_ui(db: Session = Depends(database.get_db)):
     agents = db.query(models.Agent).all()
@@ -186,24 +225,51 @@ def human_management_ui(db: Session = Depends(database.get_db)):
     
     task_rows = ""
     for t in tasks:
-        # Get submitters
-        submitters = [s.agent_id for s in t.submissions]
-        submitters_str = ", ".join(submitters) if submitters else "None"
+        # Get submitters and their statuses
+        submit_ledger = ""
+        for s in t.submissions:
+            status_color = "#ccc"
+            if s.verification_status == "verified": status_color = "#d4edda"
+            if s.verification_status == "disputed": status_color = "#f8d7da"
+            
+            verify_btns = ""
+            if s.verification_status == "pending":
+                verify_btns = f"""
+                    <div style="margin-top: 5px;">
+                        <form action='/manage/submissions/{s.id}/verify' method='post' style='display:inline'><button type='submit' class='btn-mini btn-verify'>Verify</button></form>
+                        <form action='/manage/submissions/{s.id}/dispute' method='post' style='display:inline'><button type='submit' class='btn-mini btn-dispute'>Dispute</button></form>
+                    </div>
+                """
+            
+            submit_ledger += f"""
+                <div style="background: {status_color}; padding: 8px; border-radius: 4px; margin-bottom: 8px; font-size: 0.8em; border: 1px solid #eee;">
+                    <strong>{s.agent_id}</strong>: <span style="font-family: monospace;">{s.content[:150]}{"..." if len(s.content) > 150 else ""}</span>
+                    {f'<br/><a href="{s.uri}" target="_blank">View Artifact</a>' if s.uri else ''}
+                    <br/><span style="color: #666; font-size: 0.9em;">Impact: {s.metabolic_impact:.2f} | Status: {s.verification_status}</span>
+                    {verify_btns}
+                </div>
+            """
         
-        complete_btn = f"<form action='/manage/tasks/{t.id}/complete' method='post' style='display:inline'><button type='submit' style='font-size: 10px; padding: 2px 5px;'>Mark Done</button></form>" if not t.completed else "Complete"
+        complete_btn = f"<form action='/manage/tasks/{t.id}/complete' method='post' style='display:inline'><button type='submit' class='btn-mini'>Close Task</button></form>" if not t.completed else "Closed"
         
-        # Show full text and requirements in a collapsible or just as a sub-row
+        # Simple requirements formatter: split by ';' or '-' and make a list
+        reqs_html = ""
+        if t.requirements:
+            req_items = re.split(r'[;\-\n]', t.requirements)
+            req_list = "".join([f"<li>{item.strip()}</li>" for item in req_items if item.strip()])
+            reqs_html = f'<ul style="margin: 5px 0; padding-left: 15px; font-size: 0.8em; color: #555;">{req_list}</ul>'
+
         task_rows += f"""
             <tr>
-                <td><code>{t.id}</code></td>
-                <td>{t.priority}</td>
-                <td class="status-tag">{t.status}</td>
-                <td>{submitters_str}</td>
-                <td>
+                <td style="vertical-align: top;"><code>{t.id}</code></td>
+                <td style="vertical-align: top;">{t.priority}</td>
+                <td style="vertical-align: top;"><span class="status-tag">{t.status}</span></td>
+                <td style="vertical-align: top; width: 30%;">{submit_ledger if submit_ledger else "None"}</td>
+                <td style="vertical-align: top;">
                     <strong>{t.text}</strong>
-                    {f'<br/><span style="color: #666; font-size: 0.85em;">Reqs: {t.requirements}</span>' if t.requirements else ''}
+                    {reqs_html}
                 </td>
-                <td>{complete_btn}</td>
+                <td style="vertical-align: top;">{complete_btn}</td>
             </tr>
         """
     
@@ -226,6 +292,9 @@ def human_management_ui(db: Session = Depends(database.get_db)):
                 a:hover {{ text-decoration: underline; }}
                 button {{ background: #fff; border: 1px solid #ccc; cursor: pointer; font-family: 'Inter', sans-serif; }}
                 button:hover {{ background: #f0f0f0; }}
+                .btn-mini {{ font-size: 10px; padding: 2px 5px; border-radius: 2px; }}
+                .btn-verify {{ background: #e6ffed; border-color: #b7eb8f; color: #389e0d; }}
+                .btn-dispute {{ background: #fff1f0; border-color: #ffa39e; color: #cf1322; }}
                 .status-tag {{ font-family: 'Inter', sans-serif; font-size: 0.7em; padding: 2px 6px; background: #eee; border-radius: 3px; color: #666; }}
             </style>
         </head>
@@ -246,6 +315,38 @@ def human_management_ui(db: Session = Depends(database.get_db)):
             </table>
 
             <h2>Requirements Ledger</h2>
+            <div style="background: #f9f9f9; padding: 15px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 1em;">
+                <h3 style="font-size: 0.9em; color: #666; margin-top: 0;">Create New Governance Task</h3>
+                <form action="/tasks" method="post" id="createTaskForm">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" name="text" placeholder="Task description..." style="flex: 2; padding: 5px;" required>
+                        <select name="priority" style="flex: 0.5; padding: 5px;">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <textarea name="requirements" placeholder="Detailed requirements (multi-step, use ';' or '-' to separate)..." style="width: 100%; height: 60px; padding: 5px; margin-bottom: 10px;"></textarea>
+                    <button type="submit" class="status-tag" style="background: #333; color: #fff; border: none; cursor: pointer; padding: 5px 15px;">Broadcast Task</button>
+                </form>
+                <script>
+                    document.getElementById('createTaskForm').onsubmit = async (e) => {{
+                        e.preventDefault();
+                        const formData = new FormData(e.target);
+                        const data = {{}};
+                        formData.forEach((value, key) => {{ data[key] = value; }});
+                        
+                        const resp = await fetch('/tasks', {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify(data)
+                        }});
+                        if (resp.ok) window.location.reload();
+                        else alert('Failed to create task');
+                    }};
+                </script>
+            </div>
             <table>
                 <tr><th>ID</th><th>Priority</th><th>Status</th><th>Claimed By</th><th>Requirement</th><th>Action</th></tr>
                 {task_rows if task_rows else "<tr><td colspan='6' style='text-align:center; color:#ccc; font-style:italic;'>No active tasks in the ledger.</td></tr>"}
@@ -975,6 +1076,12 @@ def get_votes(target_id: str, db: Session = Depends(database.get_db)):
     total_weight = sum(v.weight for v in votes)
     return {"target_id": target_id, "total_weight": total_weight, "votes": votes}
 
+@app.get("/api/governance/tasks")
+def list_governance_tasks(db: Session = Depends(database.get_db)):
+    tasks = db.query(models.Task).all()
+    # Filter for active/proposed or all? TASKS.md suggests rich payload for submissions.
+    return tasks
+
 @app.post("/tasks")
 def create_task(task: TaskCreate, db: Session = Depends(database.get_db)):
     # Calculate ID hash (consistent with CLI)
@@ -997,6 +1104,36 @@ def create_task(task: TaskCreate, db: Session = Depends(database.get_db)):
     db.refresh(new_task)
     return new_task
 
+@app.get("/tasks", response_class=HTMLResponse)
+def list_tasks_ui(db: Session = Depends(database.get_db)):
+    tasks = db.query(models.Task).all()
+    rows = ""
+    for t in tasks:
+        rows += f"<tr><td><code>{t.id}</code></td><td>{t.priority}</td><td>{t.status}</td><td>{t.text}</td></tr>"
+    
+    return f"""
+    <html>
+        <head>
+            <title>Task Ledger - Moltapedia</title>
+            <style>
+                body {{ background: #0a0a0a; color: #00ff41; font-family: 'Courier New', Courier, monospace; padding: 2em; }}
+                table {{ width: 100%; border-collapse: collapse; border: 1px solid #00ff41; }}
+                th, td {{ border: 1px solid #00ff41; padding: 10px; text-align: left; }}
+                th {{ background: #004400; color: #fff; }}
+                a {{ color: #00ff41; text-decoration: none; }}
+            </style>
+        </head>
+        <body>
+            <h1>METABOLIC TASK LEDGER</h1>
+            <p><a href="/">← Back to Root</a></p>
+            <table>
+                <tr><th>ID</th><th>Priority</th><th>Status</th><th>Requirement</th></tr>
+                {rows if rows else "<tr><td colspan='4'>No tasks found.</td></tr>"}
+            </table>
+        </body>
+    </html>
+    """
+
 @app.post("/tasks/{task_id}/submit")
 def submit_task(task_id: str, submission: TaskSubmission, db: Session = Depends(database.get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
@@ -1017,22 +1154,20 @@ def submit_task(task_id: str, submission: TaskSubmission, db: Session = Depends(
         task_id=task_id,
         agent_id=submission.agent_id,
         content=submission.content or submission.results or "No content provided",
-        uri=submission.uri
+        uri=submission.uri,
+        metabolic_impact=submission.metabolic_impact or 0.0,
+        verification_status="pending"
     )
     db.add(db_submission)
 
     # Logic: Multiple completions allowed. 
-    # For now, we still mark the task as 'completed' in the ledger for UI visibility,
-    # but the presence of multiple TaskSubmission records allows for multi-person tracking.
-    task.completed = True
-    task.status = "completed"
+    # We no longer mark the task as 'completed' automatically to allow multi-agent synergy.
+    # The Human Architect (or consensus logic) must close the task via the Management UI.
     
-    # Increment contribution count
+    # Increment attempt count
     if agent:
         agent.contributions += 1
-        agent.competence_score += 0.05 
         db.commit()
-        refresh_agent_governance(submission.agent_id, db)
     
     db.commit()
     
