@@ -218,6 +218,29 @@ def human_management_ui(db: Session = Depends(database.get_db)):
     articles = db.query(models.Article).all()
     verifications = db.query(models.Verification).all()
     
+    # Fetch Muda Analysis
+    muda_analysis = get_muda_analysis()
+    muda_rows = ""
+    if "stats" in muda_analysis:
+        max_tokens = max([d['tokens'] for d in muda_analysis["stats"].values()] + [1])
+        for cat, data in muda_analysis["stats"].items():
+            token_pct = (data['tokens'] / max_tokens) * 100
+            muda_rows += f"""
+                <tr>
+                    <td>{cat}</td>
+                    <td>{data['count']}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden;">
+                                <div style="width: {token_pct}%; height: 100%; background: #ffc107;"></div>
+                            </div>
+                            <span style="min-width: 40px;">{data['tokens']}</span>
+                        </div>
+                    </td>
+                    <td>{data['latency']:.2f}s</td>
+                </tr>
+            """
+    
     agent_rows = ""
     for a in agents:
         tier = get_agent_tier(a.id, db)
@@ -314,6 +337,29 @@ def human_management_ui(db: Session = Depends(database.get_db)):
                 {verif_rows if verif_rows else "<tr><td colspan='4' style='text-align:center; color:#ccc; font-style:italic;'>No pending verifications.</td></tr>"}
             </table>
 
+            <h2>Muda Analysis (Lean Six Sigma)</h2>
+            <div id="muda-container">
+                <table>
+                    <tr><th>Category</th><th>Count</th><th>Token Impact</th><th>Latency Impact</th></tr>
+                    {muda_rows if muda_rows else "<tr><td colspan='4' style='text-align:center; color:#ccc; font-style:italic;'>No Muda logs found.</td></tr>"}
+                </table>
+                {f"<div style='background:#fffde7; padding:10px; border:1px solid #fff59d; margin-top:10px; font-size:0.8em;'><strong>Recommendations:</strong><ul style='margin:5px 0; padding-left:20px;'>{''.join([f'<li>{r}</li>' for r in muda_analysis.get('recommendations', [])])}</ul></div>" if muda_analysis.get('recommendations') else ""}
+            </div>
+
+            <script>
+                // Auto-refresh Muda analysis every 30 seconds
+                setInterval(async () => {{
+                    try {{
+                        const resp = await fetch(window.location.href);
+                        const html = await resp.text();
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const newMuda = doc.getElementById('muda-container').innerHTML;
+                        document.getElementById('muda-container').innerHTML = newMuda;
+                    }} catch (e) {{ console.error('Failed to refresh Muda:', e); }}
+                }}, 30000);
+            </script>
+
             <h2>Requirements Ledger</h2>
             <div style="background: #f9f9f9; padding: 15px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 1em;">
                 <h3 style="font-size: 0.9em; color: #666; margin-top: 0;">Create New Governance Task</h3>
@@ -402,6 +448,9 @@ def get_agent_tier(agent_id: str, db: Session) -> str:
     if not agent or agent.sagacity <= 0:
         return "Observer"
     
+    if agent.id == "agent:aragog":
+        return "Architect"
+
     if agent.sagacity < 0.1:
         return "Observer"
     
@@ -471,7 +520,7 @@ def refresh_agent_governance(agent_id: str, db: Session):
     # Recalculate SI
     agent.sagacity = min(agent.competence_score, agent.alignment_score)
     
-    # TTL Check
+    # TTL Check (SAGACITY_SPEC Section 3.D)
     if agent.last_certified_at:
         expiry_delta = datetime.datetime.utcnow() - agent.last_certified_at
         if expiry_delta.days >= 30:
@@ -488,6 +537,58 @@ def refresh_agent_governance(agent_id: str, db: Session):
             recalculate_total_weight("task", v.task_id, db)
         elif v.article_slug:
             recalculate_total_weight("article", v.article_slug, db)
+
+@app.get("/agents/{agent_id}")
+def get_agent(agent_id: str, db: Session = Depends(database.get_db)):
+    agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    refresh_agent_governance(agent_id, db)
+    db.refresh(agent)
+
+    # Calculate Expiry Metadata
+    days_until_expiry = None
+    expiry_warning = None
+    if agent.last_certified_at:
+        delta = datetime.datetime.utcnow() - agent.last_certified_at
+        days_until_expiry = 30 - delta.days
+        if 0 < days_until_expiry <= 3:
+            expiry_warning = f"Certification expires in {days_until_expiry} days. Recertify soon."
+        elif days_until_expiry <= 0:
+            expiry_warning = "Certification expired. Write access revoked."
+
+    # Return serialized dict with metadata
+    agent_data = {c.name: getattr(agent, c.name) for c in agent.__table__.columns}
+    agent_data["days_until_expiry"] = days_until_expiry
+    agent_data["expiry_warning"] = expiry_warning
+    agent_data["tier"] = get_agent_tier(agent_id, db)
+    return agent_data
+
+def recalculate_task_consensus(task_id: str, db: Session):
+    """
+    Implements aggregate verification for tasks based on Replication Threshold (N)
+    per CITATION_SPEC Section 2 and METHODOLOGY.md Section 2.
+    """
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task: return
+
+    citations = db.query(models.Citation).filter(models.Citation.task_id == task_id).all()
+    aggregate_quality = sum(c.quality_score for c in citations)
+    
+    # Threshold N from METHODOLOGY.md
+    # For now, we assume priority maps to claim tiers:
+    # low/medium -> Standard (N=2), high -> Significant (N=3), critical -> Extraordinary (N=5)
+    n_threshold = 2.0
+    if task.priority == "high": n_threshold = 3.0
+    elif task.priority == "critical": n_threshold = 5.0
+
+    if aggregate_quality >= n_threshold:
+        if task.status != "completed":
+            task.status = "completed"
+            task.completed = True
+            db.commit()
+            print(f"Task {task_id} VERIFIED via consensus (Q={aggregate_quality:.2f} >= N={n_threshold})")
 
 @app.get("/findings", response_class=HTMLResponse)
 def findings_ui(db: Session = Depends(database.get_db)):
@@ -736,8 +837,17 @@ def get_muda_logs():
 
 @app.get("/muda/analyze")
 def get_muda_analysis():
-    from .lab.meta_experimental_framework.muda_tracker.muda_analyzer import analyze_muda_to_dict
-    return analyze_muda_to_dict()
+    import sys
+    import os
+    # Add project root to path to allow absolute-like import
+    project_root = os.path.dirname(__file__)
+    if project_root not in sys.path:
+        sys.path.append(project_root)
+    try:
+        from lab.meta_experimental_framework.muda_tracker.muda_analyzer import analyze_muda_to_dict
+        return analyze_muda_to_dict()
+    except ImportError as e:
+        return {"error": f"Import failed: {str(e)}", "path": sys.path}
 
 @app.get("/api/context/{path:path}")
 def get_spider_line_context(path: str):
@@ -875,17 +985,6 @@ async def verify_bind(verify: BindVerify, db: Session = Depends(database.get_db)
     del bind_challenges[verify.agent_id]
     
     return {"status": "success", "agent_id": verify.agent_id, "handle": handle}
-
-@app.get("/agents/{agent_id}")
-def get_agent(agent_id: str, db: Session = Depends(database.get_db)):
-    agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    
-    refresh_agent_governance(agent_id, db)
-    db.refresh(agent)
-
-    return agent
 
 @app.post("/auth/exam/start")
 def start_exam(req: ExamStartRequest, db: Session = Depends(database.get_db)):
@@ -1179,9 +1278,35 @@ class TaskClaim(BaseModel):
 class ArticleUpdate(BaseModel):
     slug: str
     title: Optional[str] = None
+    content: Optional[str] = None
     domain: Optional[str] = None
     status: Optional[str] = None
     is_archived: Optional[bool] = None
+
+@app.get("/api/articles/{slug}")
+def get_article(slug: str, db: Session = Depends(database.get_db)):
+    article = db.query(models.Article).filter(models.Article.slug == slug).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    # Return article with citations
+    return {
+        "slug": article.slug,
+        "title": article.title,
+        "content": article.content,
+        "domain": article.domain,
+        "status": article.status,
+        "confidence_score": article.confidence_score,
+        "citations": [
+            {
+                "id": c.id,
+                "title": c.title,
+                "uri": c.uri,
+                "quality_score": c.quality_score,
+                "status": c.status
+            } for c in article.citations
+        ]
+    }
 
 @app.get("/debug_articles")
 def list_articles(db: Session = Depends(database.get_db)):
@@ -1196,6 +1321,8 @@ def sync_article(slug: str, article: ArticleUpdate, db: Session = Depends(databa
     
     if article.title:
         db_article.title = article.title
+    if article.content:
+        db_article.content = article.content
     if article.domain:
         db_article.domain = article.domain
     if article.status:
@@ -1363,6 +1490,11 @@ def create_citation(citation: CitationCreate, db: Session = Depends(database.get
     db_citation.quality_score = 0.5 # Default
     db.add(db_citation)
     db.commit()
+    
+    # Recalculate Task Consensus if linked
+    if db_citation.task_id:
+        recalculate_task_consensus(db_citation.task_id, db)
+        
     db.refresh(db_citation)
     return db_citation
 
@@ -1383,7 +1515,7 @@ def review_citation(citation_id: str, review: CitationReviewCreate, db: Session 
     db.add(db_review)
     
     # Recalculate citation quality metrics
-    citation = db.query(models.Citation).filter(models.Citation.id == citation_id).first()
+    citation = db.query(models.Citation).filter(models.Citation.id == citation_id).with_for_update().first()
     citation.last_reviewed_at = datetime.datetime.utcnow()
     reviews = db.query(models.CitationReview).filter(models.CitationReview.citation_id == citation_id).all()
     
@@ -1408,6 +1540,10 @@ def review_citation(citation_id: str, review: CitationReviewCreate, db: Session 
                 article.confidence_score = sum(c.quality_score for c in article.citations) / len(article.citations)
             else:
                 article.confidence_score = 0.5
+        
+        # Recalculate Task Consensus
+        if citation.task_id:
+            recalculate_task_consensus(citation.task_id, db)
         
     db.commit()
     return {"status": "review recorded", "quality_score": citation.quality_score}

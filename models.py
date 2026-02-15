@@ -31,6 +31,7 @@ class Article(Base):
 
     slug = Column(String, primary_key=True, index=True)
     title = Column(String)
+    content = Column(String, nullable=True)
     domain = Column(String, default="General") # e.g. Biology, CS, Ethics
     status = Column(String, default="active") # active, archived
     is_archived = Column(Boolean, default=False)

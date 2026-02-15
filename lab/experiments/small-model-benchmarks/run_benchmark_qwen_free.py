@@ -4,7 +4,7 @@ import time
 import subprocess
 
 GATEWAY_URL = "http://localhost:18789/v1/chat/completions"
-GATEWAY_TOKEN = "eee6376ff8702b73eb46630be41b6c0a6023028171e6679a9fe4bf2099717c44"
+GATEWAY_TOKEN = "82ea3d7392b400bb9e07245d13933f2481ca37cddbd006e7"
 
 def run_qwen_free_task(prompt):
     print(f"--- Sending task to qwen-free (OpenRouter) ---")

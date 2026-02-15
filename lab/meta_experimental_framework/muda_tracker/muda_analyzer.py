@@ -3,7 +3,7 @@ import json
 import os
 from collections import defaultdict
 
-LOG_FILE = "moltapedia/lab/meta-experimental-framework/muda-tracker/muda_log.jsonl"
+LOG_FILE = os.path.join(os.path.dirname(__file__), "muda_log.jsonl")
 
 def analyze_muda_to_dict():
     if not os.path.exists(LOG_FILE):
