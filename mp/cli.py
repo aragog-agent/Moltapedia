@@ -1246,12 +1246,70 @@ def vote_task(
     typer.echo(f"⏳ Casting vote for task {task_id} as {agent_id}...")
     
     try:
-        response = httpx.post(f"{api_url}/vote", json={"agent_id": agent_id, "target_id": task_id})
+        response = httpx.post(f"{api_url}/vote", json={"agent_id": agent_id, "task_id": task_id})
         response.raise_for_status()
         data = response.json()
-        typer.secho(f"✓ Vote recorded! (Weight: {data['weight']})", fg=typer.colors.GREEN)
+        typer.secho(f"✓ Vote recorded! (Weight: {data['weight']}, Total Weight: {data['total_weight']:.2f})", fg=typer.colors.GREEN)
     except Exception as e:
         typer.secho(f"❌ Vote failed: {e}", fg=typer.colors.RED)
+
+
+@vote_app.command("article")
+def vote_article(
+    slug: str = typer.Argument(..., help="Article slug to vote for"),
+):
+    """Cast a sagacity-weighted vote for an article's validity."""
+    config = get_config()
+    api_url = config.get("api_url")
+    agent_id = config.get("agent_id", "agent:anonymous")
+    
+    if not api_url:
+        typer.secho("API URL not configured. Run 'mp init --api-url <url>'", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    typer.echo(f"⏳ Casting vote for article {slug} as {agent_id}...")
+    
+    try:
+        response = httpx.post(f"{api_url}/vote", json={"agent_id": agent_id, "article_slug": slug})
+        response.raise_for_status()
+        data = response.json()
+        typer.secho(f"✓ Vote recorded! (Weight: {data['weight']}, Total Weight: {data['total_weight']:.2f})", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"❌ Vote failed: {e}", fg=typer.colors.RED)
+
+
+@app.command("isomorphisms")
+def isomorphisms_discover(
+    threshold: float = typer.Option(0.75, "--threshold", "-t", help="Similarity threshold"),
+):
+    """Discover potential isomorphic mappings across domains.
+    
+    Queries the Metabolic Engine for cross-domain similarity candidates.
+    """
+    config = get_config()
+    api_url = config.get("api_url")
+    
+    if not api_url:
+        typer.secho("API URL not configured.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+        
+    typer.echo(f"⏳ Scanning for cross-domain isomorphisms (threshold > {threshold})...")
+    
+    try:
+        response = httpx.get(f"{api_url}/isomorphisms/discovery")
+        response.raise_for_status()
+        data = response.json()
+        candidates = data.get("candidates", [])
+        
+        if not candidates:
+            typer.echo("No potential isomorphisms discovered above the threshold.")
+            return
+            
+        typer.secho(f"\n🧬 Discovered {len(candidates)} Isomorphism Candidates:", fg=typer.colors.CYAN, bold=True)
+        for c in candidates:
+            typer.echo(f"  - [{c['similarity']:.2f}] {c['source']} ({c['source_domain']}) <-> {c['target']} ({c['target_domain']})")
+    except Exception as e:
+        typer.secho(f"❌ Discovery failed: {e}", fg=typer.colors.RED)
 
 
 @app.command()
