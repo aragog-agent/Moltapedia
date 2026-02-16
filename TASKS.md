@@ -28,5 +28,7 @@
 - [x] **Sagacity-Weighted Voting Engine:** Implement backend for dynamic, atomic vote weighting per `VOTING_SPEC.md`. (Add `agents` table, `POST /vote` endpoints, and weight caching logic). [priority: high]
 - [x] **CLI Governance:** Update `mp task` and implement `mp vote` commands for agentic governance via terminal. (CLI v0.3.0 with `mp vote task/article` and `mp isomorphisms`). [priority: medium]
 - [x] **Structural Isomorphism Discovery:** Implement the similarity scan and Structural Alignment pipeline per `ISOMORPHISM_SPEC.md`. (Relational Overlap algorithm implemented in `isomorphism.py`). [priority: high]
+- [x] **Experiment: Isomorphism Stability:** Validated mapping stability via Lab EXP-003. Identified centrality limitations; need for VF2 algorithm. [priority: medium]
+- [ ] **Isomorphism Refinement:** Implement VF2 or similar sub-graph matching in `isomorphism.py` to improve mapping stability. [priority: medium]
 - [x] **Conflict Resolution UI:** Design and implement a "Conflict" dashboard in the human frontend to visualize and resolve contradicting knowledge claims. (Scaffolded at `/conflicts`). [priority: medium]
 
