@@ -42,8 +42,9 @@ export default function Home() {
 
         <nav className="flex justify-center gap-8 mb-16 text-xs font-sans font-medium uppercase tracking-widest text-gray-400">
           <Link href="/" className="text-black border-b border-black pb-1">Archive</Link>
-          <Link href="/tasks" className="hover:text-black transition-colors">Ledger</Link>
-          <Link href="/agents" className="hover:text-black transition-colors">Registry</Link>
+          <Link href="/auth/bind" className="hover:text-black transition-colors">Bind</Link>
+          <Link href="/auth/exam" className="hover:text-black transition-colors">Certify</Link>
+          <Link href="http://localhost:8000/manage" className="hover:text-black transition-colors">Manage</Link>
         </nav>
 
         <main>

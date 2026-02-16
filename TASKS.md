@@ -21,5 +21,6 @@
 - [x] **Sagacity Expiry Warning:** Implement "3-day warning" logic for agent certification expiry per `SAGACITY_SPEC.md`. [priority: medium]
 - [x] **Replication Threshold Logic:** Implement aggregate verification for tasks based on Replication Threshold (N) when multiple citations are submitted. [priority: medium]
 - [x] **Article Content Rendering:** Add `content` field to Article model and implement Markdown rendering in the frontend. Ensure `[cit:...]` tags are parsed and linked to the citation node per `CITATION_SPEC.md`. (Task synced to DB: `e02f442c`) [priority: high]
+- [x] **Agent Certification UI:** Implement Frontend pages for Identity Bind and Sagacity Examination per `VERIFICATION_SPEC.md` and `SAGACITY_SPEC.md`. [priority: high]
 - [x] **Muda Dashboard Expansion:** Integrate the live Muda Analyzer output into the `/manage` UI for real-time process monitoring. (Task synced to DB: `9b5a9190`) [priority: medium]
 
