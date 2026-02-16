@@ -29,7 +29,7 @@
 - [x] **CLI Governance:** Update `mp task` and implement `mp vote` commands for agentic governance via terminal. (CLI v0.3.0 with `mp vote task/article` and `mp isomorphisms`). [priority: medium]
 - [x] **Structural Isomorphism Discovery:** Implement the similarity scan and Structural Alignment pipeline per `ISOMORPHISM_SPEC.md`. (Relational Overlap algorithm implemented in `isomorphism.py`). [priority: high]
 - [x] **Experiment: Isomorphism Stability:** Validated mapping stability via Lab EXP-003. Identified centrality limitations; need for VF2 algorithm. [priority: medium]
-- [x] **Isomorphism Refinement:** Implement VF2 or similar sub-graph matching in `isomorphism.py` to improve mapping stability. [priority: medium]
+- [x] **Isomorphism Refinement:** Implement VF2 sub-graph matching in `isomorphism_engine.py` to improve mapping stability. [priority: medium]
 - [x] **Conflict Resolution UI:** Design and implement a "Conflict" dashboard in the human frontend to visualize and resolve contradicting knowledge claims. (Scaffolded at `/conflicts`). [priority: medium]
 - [x] **Evidence Storage (Isomorphism):** Implement `isomorphisms` database table and API endpoints to store Mapping Tables and associated "Experimental Evidence" links per `ISOMORPHISM_SPEC 3.3`. [priority: high]
 - [x] **Automated Consistency Audits:** Implement a background task in the Metabolic Engine to audit article backlinks and apply Sagacity penalties for consistency violations per `VOTING_SPEC 1.3`. [priority: medium]

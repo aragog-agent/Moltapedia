@@ -21,20 +21,23 @@ class IsomorphismEngine:
 
     def calculate_structural_similarity(self, graph_a: nx.Graph, graph_b: nx.Graph) -> float:
         """
-        Step 2: Calculate structural alignment using Graph Edit Distance (GED).
+        Step 2: Calculate structural alignment using VF2 Subgraph Isomorphism or GED.
         """
-        # GED is computationally expensive. For the prototype, we use a simple node/edge ratio.
-        # networkx.graph_edit_distance(graph_a, graph_b) can be used for small graphs.
         try:
-            # We use an approximation or limit the calculation time.
-            # ged = nx.graph_edit_distance(graph_a, graph_b, timeout=5)
-            # return 1.0 / (1.0 + ged) if ged is not None else 0.0
+            # Select appropriate matcher based on graph type
+            if graph_a.is_directed():
+                matcher_class = nx.algorithms.isomorphism.DiGraphMatcher
+            else:
+                matcher_class = nx.algorithms.isomorphism.GraphMatcher
+                
+            matcher = matcher_class(graph_a, graph_b)
+            if matcher.is_isomorphic():
+                return 1.0
             
-            # Simple heuristic: Jaccard similarity of degrees
+            # If not perfectly isomorphic, fallback to the degree heuristic for a similarity score
             deg_a = sorted([d for n, d in graph_a.degree()])
             deg_b = sorted([d for n, d in graph_b.degree()])
             
-            # Align lists by padding with zeros
             max_len = max(len(deg_a), len(deg_b))
             deg_a += [0] * (max_len - len(deg_a))
             deg_b += [0] * (max_len - len(deg_b))
@@ -50,9 +53,18 @@ class IsomorphismEngine:
 
     def propose_mapping(self, graph_a: nx.Graph, graph_b: nx.Graph) -> Dict[str, str]:
         """
-        Step 3: Propose a mapping table between nodes of A and B.
+        Step 3: Propose a mapping table between nodes of A and B using VF2 if possible.
         """
-        # Simplified mapping: Map nodes by degree centrality
+        if graph_a.is_directed():
+            matcher_class = nx.algorithms.isomorphism.DiGraphMatcher
+        else:
+            matcher_class = nx.algorithms.isomorphism.GraphMatcher
+            
+        matcher = matcher_class(graph_a, graph_b)
+        if matcher.is_isomorphic():
+            return matcher.mapping
+            
+        # Fallback to degree centrality mapping for non-isomorphic graphs
         cent_a = sorted(nx.degree_centrality(graph_a).items(), key=lambda x: x[1], reverse=True)
         cent_b = sorted(nx.degree_centrality(graph_b).items(), key=lambda x: x[1], reverse=True)
         
