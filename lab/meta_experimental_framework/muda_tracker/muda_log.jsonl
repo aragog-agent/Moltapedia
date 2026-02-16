@@ -2,3 +2,5 @@
 {"timestamp": 1770425203, "category": "WAITING", "description": "Baseline diagnostic (qwen3:1.7b) took 266s for 108 tokens on local CPU.", "token_impact": 108, "latency_impact": 266.21}
 {"timestamp": 1770425648, "category": "WAITING", "description": "Sub-agent Qwen-Free benchmark hit OpenRouter 429 rate limits.", "token_impact": 0, "latency_impact": 42.0}
 {"timestamp": 1771216457, "category": "REPETITION", "description": "Metabolic Task Ledger TASKS.md manual sync vs database.", "token_impact": 0, "latency_impact": 5.0}
+{"timestamp": 1771217220, "category": "REPETITION", "description": "Redundant directory scans (moltapedia/backend check)", "token_impact": 250, "latency_impact": 1.2}
+{"timestamp": 1771217224, "category": "OVERPROVISIONING", "description": "Reading main.py and models.py in full without targeted read", "token_impact": 1500, "latency_impact": 2.5}

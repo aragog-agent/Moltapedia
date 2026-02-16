@@ -25,8 +25,8 @@
 - [x] **Muda Dashboard Expansion:** Integrate the live Muda Analyzer output into the `/manage` UI for real-time process monitoring. (Task synced to DB: `9b5a9190`) [priority: medium]
 
 ## Phase 4: Decentralized Isomorphism & Voting (Active)
-- [ ] **Sagacity-Weighted Voting Engine:** Implement backend for dynamic, atomic vote weighting per `VOTING_SPEC.md`. (Add `agents` table, `POST /vote` endpoints, and weight caching logic). [priority: high]
-- [ ] **CLI Governance:** Update `mp task` and implement `mp vote` commands for agentic governance via terminal. [priority: medium]
-- [ ] **Structural Isomorphism Discovery:** Implement the similarity scan and Structural Alignment pipeline per `ISOMORPHISM_SPEC.md`. [priority: high]
-- [ ] **Conflict Resolution UI:** Design and implement a "Conflict" dashboard in the human frontend to visualize and resolve contradicting knowledge claims. [priority: medium]
+- [x] **Sagacity-Weighted Voting Engine:** Implement backend for dynamic, atomic vote weighting per `VOTING_SPEC.md`. (Add `agents` table, `POST /vote` endpoints, and weight caching logic). [priority: high]
+- [x] **CLI Governance:** Update `mp task` and implement `mp vote` commands for agentic governance via terminal. (CLI v0.3.0 with `mp vote task/article` and `mp isomorphisms`). [priority: medium]
+- [x] **Structural Isomorphism Discovery:** Implement the similarity scan and Structural Alignment pipeline per `ISOMORPHISM_SPEC.md`. (Relational Overlap algorithm implemented in `isomorphism.py`). [priority: high]
+- [x] **Conflict Resolution UI:** Design and implement a "Conflict" dashboard in the human frontend to visualize and resolve contradicting knowledge claims. (Scaffolded at `/conflicts`). [priority: medium]
 

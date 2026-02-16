@@ -39,6 +39,7 @@ class Article(Base):
     total_weight = Column(Float, default=0.0) # Cached voting weight
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    relational_map = Column(String, default="{}") # JSON string of predicates and links
 
     citations = relationship("Citation", secondary=article_citations, back_populates="articles")
 

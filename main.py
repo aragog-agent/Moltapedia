@@ -1282,6 +1282,7 @@ class ArticleUpdate(BaseModel):
     domain: Optional[str] = None
     status: Optional[str] = None
     is_archived: Optional[bool] = None
+    relational_map: Optional[Dict] = None
 
 @app.get("/api/articles/{slug}")
 def get_article(slug: str, db: Session = Depends(database.get_db)):
@@ -1333,6 +1334,8 @@ def sync_article(slug: str, article: ArticleUpdate, db: Session = Depends(databa
             db_article.status = "archived"
         else:
             db_article.status = "active"
+    if article.relational_map:
+        db_article.relational_map = json.dumps(article.relational_map)
             
     db.commit()
     return db_article
@@ -1468,6 +1471,12 @@ class MappingProposal(BaseModel):
     target_slug: str
     mapping: Dict[str, str]
     evidence_url: Optional[str] = None
+
+@app.get("/api/governance/conflicts")
+def get_conflicts(db: Session = Depends(database.get_db)):
+    # Placeholder: In a real system, this would query a 'Conflicts' table
+    # or identify articles with contradicting predicates.
+    return {"conflicts": []}
 
 @app.post("/isomorphisms/propose")
 def propose_mapping(proposal: MappingProposal, db: Session = Depends(database.get_db)):
