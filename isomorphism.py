@@ -3,6 +3,8 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from typing import List, Dict
 import os
+import networkx as nx
+from networkx.algorithms import isomorphism
 
 class IsomorphismEngine:
     def __init__(self, qdrant_url: str = "http://localhost:6333"):
@@ -56,17 +58,38 @@ class IsomorphismEngine:
         return (predicate_overlap * 0.6) + (link_overlap * 0.4)
 
     def propose_mapping(self, article_a: Dict, article_b: Dict):
-        # Implementation for mapping table generation
+        """
+        Proposes a node-to-node mapping table using VF2 subgraph matching.
+        """
         graph_a = article_a.get("relational_map", {})
         graph_b = article_b.get("relational_map", {})
         
-        # In a real implementation, this would use a solver to find the best node-to-node mapping.
-        # For now, we return the structural alignment score.
+        # 1. Build NetworkX Graphs
+        ga = nx.DiGraph()
+        gb = nx.DiGraph()
+        
+        for link in graph_a.get("links", []):
+            ga.add_edge(link["source"], link["target"], type=link.get("type", "link"))
+        for link in graph_b.get("links", []):
+            gb.add_edge(link["source"], link["target"], type=link.get("type", "link"))
+            
+        # 2. Perform Subgraph Matching
+        # Using categorical edge matching if type exists
+        em = isomorphism.categorical_edge_match("type", "link")
+        matcher = isomorphism.DiGraphMatcher(ga, gb, edge_match=em)
+        
+        # We look for the best isomorphism (first one found for now)
+        mapping = {}
+        if matcher.subgraph_is_isomorphic():
+            mapping = matcher.mapping
+            
         confidence = self.calculate_ged(graph_a, graph_b)
         
         return {
             "source": article_a.get("slug"),
             "target": article_b.get("slug"),
-            "mapping": {}, # Placeholder for node-level mapping
-            "confidence": confidence
+            "mapping": mapping,
+            "confidence": confidence,
+            "isomorphic": matcher.is_isomorphic(),
+            "subgraph_isomorphic": matcher.subgraph_is_isomorphic()
         }

@@ -10,3 +10,4 @@ typer
 httpx
 python-multipart
 deepeval
+networkx
