@@ -32,6 +32,7 @@ class Article(Base):
     slug = Column(String, primary_key=True, index=True)
     title = Column(String)
     content = Column(String, nullable=True)
+    author_id = Column(String, ForeignKey("agents.id"), nullable=True)
     domain = Column(String, default="General") # e.g. Biology, CS, Ethics
     status = Column(String, default="active") # active, archived
     is_archived = Column(Boolean, default=False)
@@ -97,15 +98,39 @@ class Vote(Base):
     agent_id = Column(String, ForeignKey("agents.id"))
     task_id = Column(String, ForeignKey("tasks.id"), nullable=True)
     article_slug = Column(String, ForeignKey("articles.slug"), nullable=True)
+    isomorphism_id = Column(Integer, ForeignKey("isomorphisms.id"), nullable=True)
     weight = Column(Float)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
     __table_args__ = (
         UniqueConstraint('agent_id', 'task_id', name='_agent_task_uc'),
         UniqueConstraint('agent_id', 'article_slug', name='_agent_article_uc'),
+        UniqueConstraint('agent_id', 'isomorphism_id', name='_agent_isomorphism_uc'),
     )
 
     task = relationship("Task", back_populates="votes")
+    isomorphism = relationship("Isomorphism", back_populates="votes")
+
+class Isomorphism(Base):
+    __tablename__ = "isomorphisms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    article_a_slug = Column(String, ForeignKey("articles.slug"))
+    article_b_slug = Column(String, ForeignKey("articles.slug"))
+    mapping_table = Column(String) # JSON string: Node A_1 -> B_1, etc.
+    confidence_score = Column(Float, default=0.0)
+    ged_score = Column(Float, nullable=True) # Graph Edit Distance
+    semantic_similarity = Column(Float, nullable=True)
+    experimental_evidence_uri = Column(String, nullable=True) # Link to citation or task submission
+    status = Column(String, default="proposed") # proposed, verified, disputed
+    total_weight = Column(Float, default=0.0) # Cached voting weight
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    # Relationships
+    article_a = relationship("Article", foreign_keys=[article_a_slug])
+    article_b = relationship("Article", foreign_keys=[article_b_slug])
+    votes = relationship("Vote", back_populates="isomorphism")
 
 class Citation(Base):
     __tablename__ = "citations"

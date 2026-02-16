@@ -74,6 +74,15 @@ class VoteCreate(BaseModel):
     agent_id: str
     task_id: Optional[str] = None
     article_slug: Optional[str] = None
+    isomorphism_id: Optional[int] = None
+
+class IsomorphismCreate(BaseModel):
+    article_a_slug: str
+    article_b_slug: str
+    mapping_table: Dict[str, str]
+    ged_score: Optional[float] = None
+    semantic_similarity: Optional[float] = None
+    experimental_evidence_uri: Optional[str] = None
 
 class TaskSubmission(BaseModel):
     task_id: str
@@ -482,15 +491,18 @@ def get_agent_tier(agent_id: str, db: Session) -> str:
 
 def recalculate_total_weight(target_type: str, target_id: str, db: Session):
     """
-    Consolidated function to recalculate the total weight of a Task or Article.
+    Consolidated function to recalculate the total weight of a Task, Article, or Isomorphism.
     Enforces VOTING_SPEC 2.2 logic: sum current sagacity of all voters.
     """
     if target_type == "task":
         target = db.query(models.Task).filter(models.Task.id == target_id).first()
         voters = db.query(models.Vote).filter(models.Vote.task_id == target_id).all()
-    else:
+    elif target_type == "article":
         target = db.query(models.Article).filter(models.Article.slug == target_id).first()
         voters = db.query(models.Vote).filter(models.Vote.article_slug == target_id).all()
+    else:
+        target = db.query(models.Isomorphism).filter(models.Isomorphism.id == int(target_id)).first()
+        voters = db.query(models.Vote).filter(models.Vote.isomorphism_id == int(target_id)).all()
     
     if not target: return
 
@@ -506,6 +518,10 @@ def recalculate_total_weight(target_type: str, target_id: str, db: Session):
         target.status = "active"
     elif target_type == "article" and total_weight >= 1.0 and len(voters) >= 2 and target.status == "needs-review":
         target.status = "active"
+    elif target_type == "isomorphism" and total_weight >= 1.4 and len(voters) >= 2 and target.status == "proposed":
+        # ISOMORPHISM_SPEC 3.3: At least 2 independent agents with Sagacity Index > 0.7
+        # 0.7 * 2 = 1.4
+        target.status = "verified"
     
     db.commit()
 
@@ -1071,8 +1087,8 @@ def submit_exam(submission: ExamSubmission, db: Session = Depends(database.get_d
 
 @app.post("/vote")
 def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
-    if not vote.task_id and not vote.article_slug:
-        raise HTTPException(status_code=400, detail="Must provide task_id or article_slug")
+    if not vote.task_id and not vote.article_slug and not vote.isomorphism_id:
+        raise HTTPException(status_code=400, detail="Must provide task_id, article_slug, or isomorphism_id")
 
     agent = db.query(models.Agent).filter(models.Agent.id == vote.agent_id).first()
     if not agent:
@@ -1094,16 +1110,19 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
     if agent.sagacity <= 0:
         raise HTTPException(status_code=403, detail="Agent certification expired or missing")
 
-    target_id = vote.task_id or vote.article_slug
-    target_type = "task" if vote.task_id else "article"
+    target_id = vote.task_id or vote.article_slug or vote.isomorphism_id
+    target_type = "task" if vote.task_id else "article" if vote.article_slug else "isomorphism"
 
     # Lock the target record to prevent race conditions during weight recalculation
     if target_type == "task":
         db.query(models.Task).filter(models.Task.id == target_id).with_for_update().first()
         existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.task_id == vote.task_id).first()
-    else:
+    elif target_type == "article":
         db.query(models.Article).filter(models.Article.slug == target_id).with_for_update().first()
         existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.article_slug == vote.article_slug).first()
+    else:
+        db.query(models.Isomorphism).filter(models.Isomorphism.id == target_id).with_for_update().first()
+        existing_vote = db.query(models.Vote).filter(models.Vote.agent_id == vote.agent_id, models.Vote.isomorphism_id == vote.isomorphism_id).first()
 
     if existing_vote:
         existing_vote.weight = agent.sagacity
@@ -1113,6 +1132,7 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
             agent_id=vote.agent_id,
             task_id=vote.task_id,
             article_slug=vote.article_slug,
+            isomorphism_id=vote.isomorphism_id,
             weight=agent.sagacity
         )
         db.add(new_vote)
@@ -1120,15 +1140,51 @@ def cast_vote(vote: VoteCreate, db: Session = Depends(database.get_db)):
     db.commit()
 
     # Recalculate Truth
-    recalculate_total_weight(target_type, target_id, db)
+    recalculate_total_weight(target_type, str(target_id), db)
     
     # Fetch final state for response
     if target_type == "task":
         target = db.query(models.Task).filter(models.Task.id == target_id).first()
-    else:
+    elif target_type == "article":
         target = db.query(models.Article).filter(models.Article.slug == target_id).first()
+    else:
+        target = db.query(models.Isomorphism).filter(models.Isomorphism.id == target_id).first()
 
     return {"status": "vote recorded", "weight": agent.sagacity, "total_weight": target.total_weight, "target_status": target.status}
+
+@app.post("/api/isomorphisms")
+def create_isomorphism(iso: IsomorphismCreate, db: Session = Depends(database.get_db)):
+    # Verify articles exist
+    art_a = db.query(models.Article).filter(models.Article.slug == iso.article_a_slug).first()
+    art_b = db.query(models.Article).filter(models.Article.slug == iso.article_b_slug).first()
+    
+    if not art_a or not art_b:
+        raise HTTPException(status_code=404, detail="One or both articles not found")
+
+    db_iso = models.Isomorphism(
+        article_a_slug=iso.article_a_slug,
+        article_b_slug=iso.article_b_slug,
+        mapping_table=json.dumps(iso.mapping_table),
+        ged_score=iso.ged_score,
+        semantic_similarity=iso.semantic_similarity,
+        experimental_evidence_uri=iso.experimental_evidence_uri,
+        status="proposed"
+    )
+    db.add(db_iso)
+    db.commit()
+    db.refresh(db_iso)
+    return db_iso
+
+@app.get("/api/isomorphisms")
+def list_isomorphisms(db: Session = Depends(database.get_db)):
+    return db.query(models.Isomorphism).all()
+
+@app.get("/api/isomorphisms/{iso_id}")
+def get_isomorphism(iso_id: int, db: Session = Depends(database.get_db)):
+    iso = db.query(models.Isomorphism).filter(models.Isomorphism.id == iso_id).first()
+    if not iso:
+        raise HTTPException(status_code=404, detail="Isomorphism not found")
+    return iso
 
 class TaskVoteRequest(BaseModel):
     agent_id: str
@@ -1145,7 +1201,7 @@ def vote_on_task(task_id: str, req: TaskVoteRequest, db: Session = Depends(datab
     
     return {"total_weight": result["total_weight"]}
 
-@app.get("/governance/status")
+@app.get("/api/governance/status")
 def get_governance_status(db: Session = Depends(database.get_db)):
     agents = db.query(models.Agent).all()
     tasks = db.query(models.Task).all()
@@ -1162,6 +1218,61 @@ def get_governance_status(db: Session = Depends(database.get_db)):
         "active_tasks": len([t for t in tasks if t.status == "active"]),
         "proposed_tasks": len([t for t in tasks if t.status == "proposed"]),
         "review_queue": len([a for a in articles if a.status == "needs-review"])
+    }
+
+@app.post("/api/governance/audit/backlinks")
+def audit_backlinks(db: Session = Depends(database.get_db)):
+    """
+    Scans all articles for outdated or broken backlinks.
+    Applies Sagacity penalties to authors of articles with broken/outdated links.
+    """
+    articles = db.query(models.Article).filter(models.Article.is_archived == False).all()
+    article_map = {a.slug: a for a in articles}
+    
+    results = {"outdated": [], "broken": [], "archived": []}
+    penalties = {} # agent_id -> count
+
+    for art in articles:
+        if not art.content:
+            continue
+            
+        # Extract Obsidian-style links [[slug]]
+        links = re.findall(r'\[\[([^\]|]+)(?:\|[^\]]+)?\]\]', art.content)
+        
+        has_issue = False
+        for link_text in links:
+            target_slug = slugify(link_text)
+            
+            if target_slug not in article_map:
+                results["broken"].append({"source": art.slug, "target": target_slug})
+                has_issue = True
+            else:
+                target = article_map[target_slug]
+                if target.is_archived:
+                    results["archived"].append({"source": art.slug, "target": target_slug})
+                    has_issue = True
+                elif target.updated_at > art.updated_at:
+                    results["outdated"].append({"source": art.slug, "target": target_slug})
+                    has_issue = True
+        
+        if has_issue and art.author_id:
+            penalties[art.author_id] = penalties.get(art.author_id, 0) + 1
+            
+    # Apply penalties (VOTING_SPEC 1.3: -0.05 per violation)
+    for agent_id, count in penalties.items():
+        agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+        if agent:
+            # -0.05 per violation, capped at 0.0
+            penalty_total = 0.05 * count
+            agent.alignment_score = max(0.0, agent.alignment_score - penalty_total)
+            refresh_agent_governance(agent_id, db)
+            
+    db.commit()
+    return {
+        "status": "audit complete",
+        "issues_found": len(results["outdated"]) + len(results["broken"]) + len(results["archived"]),
+        "penalties_applied": penalties,
+        "results": results
     }
 
 @app.get("/votes/{target_id}")
