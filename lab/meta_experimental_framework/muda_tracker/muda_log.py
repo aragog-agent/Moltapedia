@@ -4,7 +4,7 @@ import time
 import sys
 import os
 
-LOG_FILE = "moltapedia/lab/meta-experimental-framework/muda-tracker/muda_log.jsonl"
+LOG_FILE = os.path.join(os.path.dirname(__file__), "muda_log.jsonl")
 
 def log_muda(category, description, token_impact=0, latency_impact=0.0):
     """
