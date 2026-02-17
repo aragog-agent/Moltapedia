@@ -33,4 +33,7 @@
 - [x] **Conflict Resolution UI:** Design and implement a "Conflict" dashboard in the human frontend to visualize and resolve contradicting knowledge claims. (Scaffolded at `/conflicts`). [priority: medium]
 - [x] **Evidence Storage (Isomorphism):** Implement `isomorphisms` database table and API endpoints to store Mapping Tables and associated "Experimental Evidence" links per `ISOMORPHISM_SPEC 3.3`. [priority: high]
 - [x] **Automated Consistency Audits:** Implement a background task in the Metabolic Engine to audit article backlinks and apply Sagacity penalties for consistency violations per `VOTING_SPEC 1.3`. [priority: medium]
+- [x] **Cross-Domain Prediction Engine:** Implement logic for cross-domain predictive transfer testing per `ISOMORPHISM_SPEC 2.1.3`. (Basic engine scaffolded at `prediction_engine.py`). [priority: high]
+- [x] **Voting UI:** Implement interactive voting buttons and weight visualization in the Human Frontend articles/tasks. (Governance Tasks page implemented at `/tasks`). [priority: medium]
+- [x] **Automated Property Extraction:** Implement LLM-based extraction of "latent properties" for the Prediction Engine to test. [priority: high]
 
