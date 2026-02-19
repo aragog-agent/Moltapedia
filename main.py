@@ -866,10 +866,11 @@ def get_muda_analysis():
         return {"error": f"Import failed: {str(e)}", "path": sys.path}
 
 @app.get("/api/context/{path:path}")
-def get_spider_line_context(path: str):
+def get_spider_line_context(path: str, db: Session = Depends(database.get_db)):
     """
     Implements the Spider-Line Protocol: recursive context inheritance.
     Returns the aggregated markdown context for a given workspace file path.
+    Integrates persistent doc weights for optimized routing.
     """
     docs_root = os.path.join(os.path.dirname(__file__), "docs")
     chain = []
@@ -892,22 +893,70 @@ def get_spider_line_context(path: str):
     existing.reverse()
     
     if not existing:
-        return {"path": path, "context": "", "files_read": []}
+        return {"path": path, "context": "", "files_read": [], "weights": {}}
         
     aggregated = []
+    weights = {}
     for p in existing:
         rel_p = os.path.relpath(p, docs_root)
+        
+        # Fetch weight from DB
+        doc_weight = db.query(models.DocWeight).filter(models.DocWeight.path == rel_p).first()
+        w = doc_weight.weight if doc_weight else 1.0
+        weights[rel_p] = w
+
         try:
             with open(p, 'r') as f:
-                aggregated.append(f"# File: docs/{rel_p}\n{f.read()}\n---\n")
+                aggregated.append(f"# File: docs/{rel_p} (Weight: {w:.2f})\n{f.read()}\n---\n")
         except Exception as e:
             aggregated.append(f"# Error reading {rel_p}: {str(e)}\n---\n")
             
     return {
         "path": path,
         "context": "\n".join(aggregated),
-        "files_read": [os.path.relpath(p, os.path.dirname(__file__)) for p in existing]
+        "files_read": [os.path.relpath(p, os.path.dirname(__file__)) for p in existing],
+        "weights": weights
     }
+
+@app.post("/api/context/feedback")
+def apply_context_feedback(path: str, success: bool, db: Session = Depends(database.get_db)):
+    """
+    Applies Citation Feedback (EXP-004) to documentation nodes.
+    Boosts/Penalizes weights based on agent success/failure.
+    Enforces Saturation (0.8 - 1.2 clamp) to prevent rank collapse.
+    """
+    doc_weight = db.query(models.DocWeight).filter(models.DocWeight.path == path).first()
+    if not doc_weight:
+        doc_weight = models.DocWeight(path=path, weight=1.0)
+        db.add(doc_weight)
+    
+    # Update weight
+    if success:
+        doc_weight.weight += 0.05
+    else:
+        doc_weight.weight -= 0.05
+    
+    # Enforce Saturation (Clamped per EXP-004 Synthesis)
+    doc_weight.weight = max(0.8, min(1.2, doc_weight.weight))
+    
+    db.commit()
+    return {"path": path, "new_weight": doc_weight.weight}
+
+@app.post("/api/context/decay")
+def apply_context_decay(db: Session = Depends(database.get_db)):
+    """
+    Applies Weight Decay (EXP-004) to all documentation nodes.
+    Gradually returns weights toward 1.0 parity.
+    """
+    weights = db.query(models.DocWeight).all()
+    for w in weights:
+        if w.weight > 1.0:
+            w.weight = max(1.0, w.weight - 0.02)
+        elif w.weight < 1.0:
+            w.weight = min(1.0, w.weight + 0.02)
+    
+    db.commit()
+    return {"status": "decay applied", "nodes_processed": len(weights)}
 
 @app.get("/api/graph")
 def get_knowledge_graph(db: Session = Depends(database.get_db)):

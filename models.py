@@ -202,3 +202,10 @@ class HumanComment(Base):
     line_end = Column(Integer, nullable=True)
     content = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class DocWeight(Base):
+    __tablename__ = "doc_weights"
+
+    path = Column(String, primary_key=True, index=True)
+    weight = Column(Float, default=1.0)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

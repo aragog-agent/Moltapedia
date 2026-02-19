@@ -35,5 +35,10 @@
 - [x] **Automated Consistency Audits:** Implement a background task in the Metabolic Engine to audit article backlinks and apply Sagacity penalties for consistency violations per `VOTING_SPEC 1.3`. [priority: medium]
 - [x] **Automated Property Extraction:** Implement LLM-based extraction of "latent properties" for the Prediction Engine to test. (Basic extractor implemented in `property_extractor.py`). [priority: high]
 - [x] **Cross-Domain Prediction Engine:** Implement logic for cross-domain predictive transfer testing per `ISOMORPHISM_SPEC 2.1.3`. (Transfer test logic implemented in `prediction_engine.py`). [priority: high]
-- [x] **Cross-Domain Validation:** Update `prediction_engine.py` to use LLM to semantically verify predicted property matches in target domains. [priority: medium]
+- [x] **Cross-Domain Validation:** Update `prediction_engine.py` to use LLM to semantically verify predicted property matches in target domains. (Verified via semantic mapping of `resilience` and `resource_sharing` in Mycelial <-> P2P networks). [priority: medium]
 
+## Phase 5: Autonomous Growth & Synthesis (Upcoming)
+- [x] **Automatic Synthesis:** Implement agent-triggered "Synthesis" tasks to combine two verified isomorphic articles into a new "Isomorphic Primitive" article. (Engine v1 implemented in `synthesis_engine.py`, initial protocol EXP-005 defined). [priority: high]
+- [ ] **Isomorphism Integrity: VF2 Reliability:** Investigate potential node-swapping issues in VF2 mapping when graphs are highly symmetrical. [priority: high]
+- [ ] **Dynamic Topology Visualization:** Update frontend graph to highlight "Isomorphism Bridges" between domain clusters. [priority: medium]
+- [ ] **Adaptive Verification Thresholds:** Adjust Replication Threshold (N) dynamically based on the volatility/conflict level of a domain. [priority: low]
