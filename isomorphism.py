@@ -60,6 +60,7 @@ class IsomorphismEngine:
     def propose_mapping(self, article_a: Dict, article_b: Dict):
         """
         Proposes a node-to-node mapping table using VF2 subgraph matching.
+        Implements Deterministic Selection and Semantic Anchoring per VF2-RELIABILITY-REPORT.
         """
         graph_a = article_a.get("relational_map", {})
         graph_b = article_b.get("relational_map", {})
@@ -68,20 +69,31 @@ class IsomorphismEngine:
         ga = nx.DiGraph()
         gb = nx.DiGraph()
         
+        # Add nodes with tags (Semantic Anchoring)
+        for node in graph_a.get("nodes", []):
+            ga.add_node(node["id"], tag=node.get("tag", "generic"))
+        for node in graph_b.get("nodes", []):
+            gb.add_node(node["id"], tag=node.get("tag", "generic"))
+
         for link in graph_a.get("links", []):
             ga.add_edge(link["source"], link["target"], type=link.get("type", "link"))
         for link in graph_b.get("links", []):
             gb.add_edge(link["source"], link["target"], type=link.get("type", "link"))
             
         # 2. Perform Subgraph Matching
-        # Using categorical edge matching if type exists
+        # Using categorical edge AND node matching for stability
         em = isomorphism.categorical_edge_match("type", "link")
-        matcher = isomorphism.DiGraphMatcher(ga, gb, edge_match=em)
+        nm = isomorphism.categorical_node_match("tag", "generic")
+        matcher = isomorphism.DiGraphMatcher(ga, gb, node_match=nm, edge_match=em)
         
-        # We look for the best isomorphism (first one found for now)
+        # 3. Deterministic Selection
+        # Collect all isomorphisms and sort them by string representation to ensure stability
+        all_mappings = list(matcher.subgraph_isomorphisms_iter())
         mapping = {}
-        if matcher.subgraph_is_isomorphic():
-            mapping = matcher.mapping
+        if all_mappings:
+            # Sort by stringified dict for a stable choice if multiple exist
+            all_mappings.sort(key=lambda x: str(sorted(x.items())))
+            mapping = all_mappings[0]
             
         confidence = self.calculate_ged(graph_a, graph_b)
         
@@ -91,5 +103,7 @@ class IsomorphismEngine:
             "mapping": mapping,
             "confidence": confidence,
             "isomorphic": matcher.is_isomorphic(),
-            "subgraph_isomorphic": matcher.subgraph_is_isomorphic()
+            "subgraph_isomorphic": matcher.subgraph_is_isomorphic(),
+            "ambiguity_count": len(all_mappings)
         }
+

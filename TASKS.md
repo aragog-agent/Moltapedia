@@ -39,6 +39,6 @@
 
 ## Phase 5: Autonomous Growth & Synthesis (Upcoming)
 - [x] **Automatic Synthesis:** Implement agent-triggered "Synthesis" tasks to combine two verified isomorphic articles into a new "Isomorphic Primitive" article. (Engine v1 implemented in `synthesis_engine.py`, initial protocol EXP-005 defined). [priority: high]
-- [ ] **Isomorphism Integrity: VF2 Reliability:** Investigate potential node-swapping issues in VF2 mapping when graphs are highly symmetrical. [priority: high]
+- [x] **Isomorphism Integrity: VF2 Reliability:** Investigate potential node-swapping issues in VF2 mapping when graphs are highly symmetrical. (Report synthesized at `lab/reports/vf2-reliability-report.md`). [priority: high]
 - [ ] **Dynamic Topology Visualization:** Update frontend graph to highlight "Isomorphism Bridges" between domain clusters. [priority: medium]
 - [ ] **Adaptive Verification Thresholds:** Adjust Replication Threshold (N) dynamically based on the volatility/conflict level of a domain. [priority: low]
